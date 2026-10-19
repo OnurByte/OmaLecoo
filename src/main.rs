@@ -671,7 +671,7 @@ fn preset_state(name: &str) -> Result<State, String> {
 
 fn usage() {
     println!(
-        "lecoo-gk301 — Lecoo GK301 keyboard RGB control\n\
+        "lecoo-gk301 — OmaLecoo: Lecoo GK301 keyboard RGB control for Omarchy\n\
 \n\
 Usage:\n\
   lecoo-gk301 capabilities [--json]        show verified capabilities\n\

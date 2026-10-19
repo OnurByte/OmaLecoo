@@ -4,7 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Bar entry point for the Lecoo GK301 RGB panel.
+// OmaLecoo: bar entry point for the Lecoo GK301 RGB panel.
 //
 // The glyph in the bar is just a door: left click opens the control panel,
 // right click steps to the next panel effect and the wheel walks the panel
@@ -71,7 +71,7 @@ BarWidget {
     text: "\uf11c"
     active: root.panel ? (root.panel.firmware !== "" && root.panel.lit) : false
     activeColor: Color.accent
-    tooltipText: root.panel ? root.panel.tooltipText() : "Lecoo GK301"
+    tooltipText: root.panel ? root.panel.tooltipText() : "OmaLecoo · Lecoo GK301"
     onPressed: function(b) {
       if (b === Qt.RightButton) {
         if (root.panel) root.panel.nextEffect()

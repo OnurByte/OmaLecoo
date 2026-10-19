@@ -1,4 +1,4 @@
-# Release verification — 1.1.0
+# Release verification — 1.2.0
 
 Run from the project directory:
 
@@ -12,43 +12,37 @@ python3 tests/panel-only.py
 bash -n install.sh scripts/install-udev.sh
 ```
 
-The QML import folder is a local lint aid pointing to the installed Omarchy
-modules; runtime loading remains the decisive check for host dynamic
-properties.
+## What changed in 1.2.0 (OmaLecoo)
 
-## What changed in 1.1.0
-
-- New `lecoo-gk301 response [--json]`: performs the recovered firmware query
-  (`07 F1 00 00 00 00 00 00`, then GET_FEATURE), validates the transfer byte
-  count, report ID and BCD version format, and prints the device reply with
-  device path, raw report, parsed firmware, kind and roundtrip time. Defaults
-  to a human-readable report; `--json` exposes the same fields for the panel.
-- Removed every user-facing semantic that shipped without physical effect:
-  the `side`, `side-next`, `raw` and `reset` commands and all side-brightness
-  state. The side writer belongs to the Windows tool's hidden Mouse page and
-  never changed this keyboard's LEDs. `capabilities` now reports
-  `side_control: "unsupported"` and keeps `custom_rgb`/`per_key_rgb`
-  marked `unverified`.
-- Profiles saved by 1.0 with side fields remain loadable; new saves are
-  main-panel only. `doctor` now validates the firmware reply and prints the
-  device node. Pacing (100 ms Windows gate) and the process-wide command lock
-  are unchanged.
+- Project renamed to **OmaLecoo**; Cargo crate is `omalecoo` while the
+  installed binary keeps the historical name `lecoo-gk301`, so the running
+  Quickshell plugin and the user's state directory stay valid across
+  updates. Plugin id `borat.lecoo-rgb` unchanged.
+- Manifest name/panel header/bar tooltip are OmaLecoo with the GK301
+  identity in the description.
+- Every remaining document under `docs/` is English; the Turkish-named
+  sample profile was removed from local state and no default profile is
+  seeded.
+- New research round documented in
+  `docs/captures/extended-brightness-experiment.md`: REA resolved the
+  startup apply chain (`sub_4206f0` task via the open-success path) and the
+  vendor descriptor's three channels (Feature/Output usage 04/Input
+  report 3 F1..F8). Hardware probes replayed the exact Windows startup
+  record `07 FF FF 00 0D 00 00 00` and an intermediate-brightness sweep;
+  the device accepted all of them without vendor input reports. UI stays
+  limited to physically confirmed controls pending the user's visual
+  confirmation of the extended scale.
+- `scripts/probe-extended-brightness.py` added: bounded, lock-respecting
+  probe with concurrent vendored input-report listening.
 
 ## Executed release checks
 
-19 October 2026 (1.1.0): six Rust tests passed (including the new
-firmware-format validation test); Clippy all targets passed with no
-warnings; release build passed; UI state tests, offline CLI integration and
-panel-only transport interception passed, including the `response` fixture
-matrix (short transfer, wrong report ID, empty payload, bad version, short
-set). Installer shell syntax valid. No sudo was required: the udev rule
-already matched the installed rule, so `install.sh` performed a
-password-free update.
-
-Version 1.1.0 was installed from this tree. Live checks on the attached
-keyboard: `doctor` returned the actual firmware 1.16 acknowledgment through
-the new validated path. The historical 1.0.0 notes below remain accurate for
-that build.
+19 October 2026 (1.2.0): Rust tests, Clippy (all targets, -D warnings),
+release build, UI state tests, offline CLI integration, panel-only
+transport interceptors and installer shell syntax all passed. Product
+QML/manifest/install scripts pass the English-text scan. No sudo was
+needed for the udev rule (already installed and matching), and no capture
+daemon was installed during the research round.
 
 ## Historical — release 1.0.0
 
@@ -66,3 +60,4 @@ errors were found. No dumpcap process remained running. User-created profile
 names and historical research logs were preserved rather than translated.
 
 Readback sequence and REA evidence are documented in FINAL-ANALYSIS.md.
+

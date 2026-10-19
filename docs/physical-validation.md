@@ -1,49 +1,54 @@
-# Fiziksel kullanıcı doğrulaması — 2026-10-19
+# Physical user validation — 2026-10-19
 
-Önceki transfer testlerinin rc=8 sonucu LED'in değiştiğini kanıtlamıyordu.
-Bu turdaki fiziksel gözlem, doğrudan kullanıcının yanıtlarıyla kaydedildi:
+Earlier transfer tests proving rc=8 did not prove the LEDs changed. The
+physical observations in this round were recorded directly with the user's
+own answers:
 
-1. Ayrı CLI çağrılarıyla panel0/parlaklık5 ve side3/parlaklık7 Feature:
-   kullanıcı hiçbir değişiklik olmadığını bildirdi.
-2. Aynı iki bilinen ışık paketi Output: kullanıcı değişiklik olmadığını bildirdi.
-3. Aynı açık handle üzerinde F1 Set/Get, 150ms aralıklarla aynı panel/yan
-   paketleri: kullanıcı kısa titreme ve önceki duruma dönüş bildirdi.
-4. Windows'tan kurtarılan gecikmeli başlangıç yolu: aynı açık handle F1
-   Set/Get, 2 saniye bekle, `07 FF FF 00 0D 00 00 00` Feature, 2 saniye
-   açık tut. Kullanıcı bu kez kalıcı değişiklik olduğunu bildirdi.
+1. Panel 0 / brightness 5 and side 3 / brightness 7 as separate CLI calls via
+   Feature: the user reported no change at all.
+2. The same two known light packets as Output transfers: the user reported
+   no change.
+3. F1 Set/Get on the same open handle, then the same panel/side packets at
+   150 ms intervals: the user reported a brief flicker, then a return to
+   the previous state.
+4. The delayed startup path recovered from Windows: on one kept-open handle,
+   F1 Set/Get, wait 2 seconds, then Feature `07 FF FF 00 0D 00 00 00`, hold
+   open for 2 seconds. This time the user reported a permanent change.
 
-Son deney hem bekleme süresini hem brightness alanını değiştirdi. Bu yüzden
-nedenin yalnızca gecikme, 0D değeri veya bağlantının açık kalması olduğu
-iddia edilemez. Henüz otomatik yeni bir aydınlatma protokolü eklenmedi.
+The last experiment changed both the wait and the brightness byte at once,
+so the cause cannot be attributed to delay alone, to the 0D value alone, or
+only to the open connection. No new lighting protocol has been enabled
+automatically yet.
 
-Kullanıcı, mevcut efekt kontrollerinin çalıştığını ayrıca belirtti. Tüm
-kontrolleri kaldırmak bu geri bildirimle kapsam dışına çıktı ve geri alındı.
-Efektler, parlaklık, mevcut yan efekt listesi ve profiller geri yüklendi.
-Sadece üstteki dekoratif klavye çizimi ve başarısı doğrulanmamış yeni renk
-kısayolları kaldırıldı. Önceki UI archive/0.4.0-plugin altında korunuyor.
+The user also confirmed the existing effect controls work. Removing all
+controls would have over-corrected that feedback and was reverted; effects,
+brightness, the existing side-effect list and profiles were restored. Only
+the decorative keyboard diagram at the top and the unproven new color
+shortcuts were removed. The prior UI is preserved under archive/0.4.0-plugin.
 
-Kalan ayrım: mevcut efekt komutlarını, gecikmeli başlangıç paketinin byte4
-0D değeri ve fiziksel etkisiyle karşılaştırmak; gerçek cihaz LED durumunun
-okunup okunamadığını belirlemek. Rastgele ham komut taraması yapılmadı.
+Remaining split: compare the current effect commands against the startup
+packet's byte4 0D value and its physical effect; determine whether the
+device's real LED state can be read back. No random raw command scanning was
+performed.
 
-## Son kullanıcı doğrulaması ve model sınırı
+## Final user validation and model boundary
 
-Kullanıcı geri yüklenen ana efekt seçicisinin fiziksel klavyeyi değiştirdiğini,
-yan LED kontrollerinin ise tepki vermediğini doğruladı.
+The user confirmed the restored main-effect selector changes the physical
+keyboard and that the side LED controls did not react.
 
-Yeni XML bulgusu: dlg_main.xml 15–124 arası Keyboard sayfasıdır; Panel LED
-buradadır. Side LED ise 125. satırdaki Mouse sayfasının 126. satırında
-visible=0 ile yer alır. Bu, GK301 yan LED desteğini göstermeyen genel uygulama
-kodu olduğunu güçlü biçimde düşündürür; kesin firmware yokluğu iddiası değildir.
-Yan LED UI'si kaldırıldı; ana efektler korundu. UI profil-load/preset/restore
-komutları --panel-only kullanır, bu yollardan side paketi çıkmaz. Legacy
-araştırma CLI'si ve referanslar korunur.
+New XML finding: dlg_main.xml lines 15–124 are the Keyboard page; Panel LED
+lives there. Side LED appears at line 126 inside the Mouse page (line 125)
+behind visible=0. That strongly suggests shared application code that does
+not represent GK301 side-LED support; it is not a claim of firmware absence.
+The side LED UI was removed; main effects were kept. UI profile-load,
+preset and restore use --panel-only, so no side packet leaks out of those
+paths. Legacy research CLI and references are preserved.
 
-Makro araştırması: 420580 işçisi 420621 adresinde Windows keybd_event çağırır;
-makrolar bilgisayarda yürütülür. Dahili klavye hafızasına makro yazma protokolü
-çıkarılmış sayılmaz. Bu nedenle on-device makro özelliği eklenmedi.
+Macro investigation: worker 0x420580 calls Windows keybd_event at 0x420621;
+macros execute on the host. Recovering an on-device macro programming
+protocol is not established, so no on-device macro feature was added.
 
-scripts/probe-windows-startup.py varsayılan salt gösterim modundadır;
---send verilirse önceki fiziksel deneyi aynı açık bağlantıda tekrarlar.
-Son paketin byte4 değeri0D ve gecikme aynı deneyde değiştiğinden bunların
-tekil etkisi hâlâ ayrıştırılmadı.
+scripts/probe-windows-startup.py defaults to display-only mode; with
+--send it replays the earlier physical experiment on one open connection.
+Because the last packet's byte4 0D and the delay changed within the same
+experiment, their individual effects remain unresolved.

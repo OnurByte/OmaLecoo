@@ -1,7 +1,7 @@
-# Lecoo GK301 RGB for Omarchy
+# OmaLecoo
 
-A native Omarchy bar plugin + Rust CLI for the Lecoo GK301 gaming keyboard
-(SEMICO `1a2c:9df4`). 20 lighting effects, brightness, speed, presets,
+Lecoo GK301 keyboard RGB lighting for Omarchy — a native bar plugin + Rust
+CLI (SEMICO `1a2c:9df4`). 20 lighting effects, brightness, speed, presets,
 profiles, connection diagnostics — all through real HID Feature reports that
 I recovered by reverse engineering the official Windows tool.
 
@@ -30,8 +30,8 @@ keyboard, so I did the normal thing instead:
 - recorded the real USB traffic with a usbmon capture while applying effects,
 - rebuilt the confirmed protocol as a tiny Rust binary + Quickshell panel.
 
-The result is a plugin that talks to the keyboard natively on Omarchy — no
-Wine, no VM, no sudo after install.
+The result is OmaLecoo: a plugin that talks to the keyboard natively on
+Omarchy — no Wine, no VM, no sudo after install.
 
 ## What it actually does (no fairy tales)
 

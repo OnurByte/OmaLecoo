@@ -104,7 +104,7 @@ Panel {
 
   function tooltipText() {
     var name = root.effectLabel(root.effect)
-    return "Lecoo GK301 · " + name + " · brightness " + root.brightness + "/5"
+    return "OmaLecoo · " + name + " · brightness " + root.brightness + "/5"
       + (root.firmware !== "" ? " · fw " + root.firmware : "")
       + (root.autoCycle ? " · auto" : "")
       + (root.connectionError !== "" ? " · disconnected" : "")
@@ -412,7 +412,7 @@ Panel {
 
               Text {
                 width: parent.width
-                text: "LECOO GK301"
+                text: "OmaLecoo · GK301"
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.title

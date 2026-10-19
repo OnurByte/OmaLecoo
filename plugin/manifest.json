@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "borat.lecoo-rgb",
-  "name": "Lecoo GK301",
-  "version": "1.1.0",
+  "name": "OmaLecoo",
+  "version": "1.2.0",
   "author": "borat",
-  "description": "Lighting controls and connection diagnostics for the Lecoo GK301",
+  "description": "Lecoo GK301 keyboard RGB lighting controls for Omarchy",
   "kinds": [
     "bar-widget"
   ],
@@ -12,8 +12,8 @@
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "Lecoo GK301",
-    "description": "Effects, brightness, saved profiles and connection diagnostics",
+    "displayName": "OmaLecoo",
+    "description": "Lecoo GK301 lighting effects, brightness, saved profiles and diagnostics",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right",

@@ -1,10 +1,12 @@
 [package]
-name = "lecoo-gk301"
-version = "1.1.0"
+name = "omalecoo"
+version = "1.2.0"
 edition = "2021"
-description = "Lecoo GK301 keyboard RGB control (hidraw, report ID 7)"
+description = "OmaLecoo — Lecoo GK301 keyboard RGB control for Omarchy (hidraw, report ID 7)"
 license = "MIT"
 
+# The installed binary keeps the historical name so the running Quickshell
+# plugin and the user's state directory stay valid across updates.
 [[bin]]
 name = "lecoo-gk301"
 path = "src/main.rs"
