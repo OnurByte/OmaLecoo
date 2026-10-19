@@ -5,6 +5,9 @@ edition = "2021"
 description = "OmaLecoo — Lecoo GK301 keyboard RGB control for Omarchy (hidraw, report ID 7)"
 license = "MIT"
 
+[dependencies]
+serde_json = "1"
+
 # The installed binary keeps the historical name so the running Quickshell
 # plugin and the user's state directory stay valid across updates.
 [[bin]]

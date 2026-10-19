@@ -33,7 +33,9 @@ historical release notes; it does not announce publication of v1.5.0.
   boundaries, packet map, maintenance commands and direct evidence links.
 
 Automation and service-driven reconnect recovery require Omarchy's built-in
-bar. No stable public lock-state signal is assumed. The new software features
+bar. Automatic/recovery writes are gated on a live built-in widget attachment;
+detaching the last widget cancels pending recovery. No stable public lock-state
+signal is assumed. The new software features
 do not establish custom RGB, per-key RGB, on-device macros or lighting-state
 readback. See [hardware conclusions](FINAL-ANALYSIS.md) and the
 [extended-brightness observation](captures/extended-brightness-experiment.md)
@@ -89,6 +91,14 @@ not execution of installation, removal or HID commands.
   cleanup, and checked automatic/manual Cargo availability refresh.
 - README/verification update: `git diff --check` passed; commands, paths,
   feature claims and evidence links were inspected against the repository.
+- Final integration correction (based on `5a2590b`): `cargo fmt --check`,
+  `cargo check --all-targets --locked --offline`, three-file QML parsing, service-only
+  lint, plugin validation and `git diff --check` passed. Checkout installation
+  includes the service. Static review traced pending reloads and stale process
+  results after controller changes, built-in widget attachment/removal, and a
+  reconnect that becomes writable later. Blackbox output now validates each
+  JSON object with `serde_json` and skips malformed entries. These checks do
+  not verify the asynchronous flows or hardware effects at runtime.
 
 No test suite was added or run for this v1.5 implementation. No live QML
 session, new physical GK301 validation, source installation, polkit action,

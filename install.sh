@@ -22,7 +22,7 @@ case "$PWD" in
   *)
     mkdir -p "$backup" "$plugin_path"
     if [[ -f "$plugin_path/manifest.json" ]]; then cp -a "$plugin_path/." "$backup/"; fi
-    install -m644 manifest.json BarWidget.qml Panel.qml "$plugin_path/"
+    install -m644 manifest.json BarWidget.qml Panel.qml SignalService.qml "$plugin_path/"
     # Retired decorative components; the backup above retains their copies.
     rm -f -- "$plugin_path/ProfileControls.qml"
     rm -f -- "$plugin_path/StudioCard.qml"

@@ -698,9 +698,9 @@ Usage:\n\
   lecoo-gk301 capabilities [--json]        show verified capabilities\n\
   lecoo-gk301 doctor                       connection and debug information\n\
   lecoo-gk301 response [--json]            validated firmware return path\n\
-  lecoo-gk301 restore                      apply last lighting settings\n\
-  lecoo-gk301 dev                          show device node\n\
-  lecoo-gk301 status [--json]              show last applied state\n\
+  lecoo-gk301 restore                      apply saved manual settings\n\
+  lecoo-gk301 dev [--json]                 show device presence and writability\n\
+  lecoo-gk301 status [--json]              show saved manual state (not lighting readback)\n\
   lecoo-gk301 rules [--json]               show automation settings\n\
   lecoo-gk301 rules set --automation <on|off> --restore-on-reconnect <on|off>\n\
   lecoo-gk301 blackbox --json              show recent HID command history\n\
@@ -716,6 +716,7 @@ Usage:\n\
   lecoo-gk301 list                         effect names\n\
 \n\
 Options: --device /dev/hidrawN (or LECOO_DEVICE)\n\
+         --origin <panel|signal> for HID commands (optional; default: cli)\n\
 Firmware query: 07 F1…, panel commands: 07 FF FF … (8-byte Feature reports)\n\
 Not built in: side LEDs (no effect on this keyboard), custom RGB, on-device\n\
 macros — see docs/FINAL-ANALYSIS.md."
@@ -1131,7 +1132,12 @@ fn blackbox_json() -> String {
         if let Ok(contents) = fs::read_to_string(path) {
             let mut file_entries: Vec<String> = contents
                 .lines()
-                .filter(|line| line.starts_with('{') && line.ends_with('}'))
+                .filter(|line| {
+                    matches!(
+                        serde_json::from_str::<serde_json::Value>(line),
+                        Ok(serde_json::Value::Object(_))
+                    )
+                })
                 .map(str::to_owned)
                 .collect();
             file_entries.reverse();

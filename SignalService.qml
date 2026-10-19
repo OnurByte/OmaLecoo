@@ -26,29 +26,68 @@ Item {
   property var manualQueue: []
   property string appliedRule: ""
   property bool reconnectPending: false
+  property var attachedWidgets: []
+  readonly property bool automaticWritesAllowed: attachedWidgets.length > 0
+  // Keep reload requests across in-flight attempts. Generation identifies the
+  // configured controller; each Process also identifies its own callbacks.
+  property int controllerGeneration: 0
+  property bool rulesReloadPending: false
+  property bool presenceReloadPending: false
   readonly property bool busy: writer.running || manualQueue.length > 0
   readonly property var activeToplevel: ToplevelManager.activeToplevel
   readonly property bool fullscreen: activeToplevel ? activeToplevel.fullscreen : false
   signal panelCommandFinished(string requestId, int code, string error, string output)
   signal commandFinished()
 
-  function reloadState() {
-    if (!rulesProc.running && rulesProc.handled) {
-      rulesProc.output = ""
-      rulesProc.error = ""
-      rulesProc.handled = false
-      rulesProc.running = true
+  function attachWidget(widget) {
+    if (attachedWidgets.indexOf(widget) === -1)
+      attachedWidgets = attachedWidgets.concat([widget])
+    schedule()
+  }
+
+  function detachWidget(widget) {
+    attachedWidgets = attachedWidgets.filter(function(item) { return item !== widget })
+    if (!automaticWritesAllowed) {
+      reconnectPending = false
+      appliedRule = ""
     }
+    schedule()
+  }
+
+  function reloadState() {
+    rulesReloadPending = true
+    startRulesRead()
     checkPresence()
     schedule()
   }
 
+  function startRulesRead() {
+    if (!rulesReloadPending || rulesProc.running || !rulesProc.handled
+        || rulesWrite.running || !rulesWrite.handled) return
+    rulesReloadPending = false
+    rulesProc.output = ""
+    rulesProc.error = ""
+    rulesProc.generation = controllerGeneration
+    rulesProc.attempt += 1
+    rulesProc.command = [binary, "rules", "--json"]
+    rulesProc.handled = false
+    rulesProc.running = true
+  }
+
   function checkPresence() {
-    if (!presenceProc.running && presenceProc.handled) {
-      presenceProc.output = ""
-      presenceProc.handled = false
-      presenceProc.running = true
-    }
+    presenceReloadPending = true
+    startPresenceRead()
+  }
+
+  function startPresenceRead() {
+    if (!presenceReloadPending || presenceProc.running || !presenceProc.handled) return
+    presenceReloadPending = false
+    presenceProc.output = ""
+    presenceProc.generation = controllerGeneration
+    presenceProc.attempt += 1
+    presenceProc.command = [binary, "dev", "--json"]
+    presenceProc.handled = false
+    presenceProc.running = true
   }
 
   function setRules(automation, recovery) {
@@ -56,6 +95,8 @@ Item {
     rulesWrite.command = [binary, "rules", "set", "--automation", automation ? "on" : "off",
                           "--restore-on-reconnect", recovery ? "on" : "off"]
     rulesWrite.error = ""
+    rulesWrite.generation = controllerGeneration
+    rulesWrite.attempt += 1
     rulesWrite.handled = false
     rulesWrite.running = true
   }
@@ -77,6 +118,7 @@ Item {
 
   function updateRule() {
     if (suspended) { activeRule = "Paused"; ruleReason = "Setup or removal is in progress." }
+    else if (!automaticWritesAllowed) { activeRule = "Unavailable"; ruleReason = "Automation requires an attached Omarchy built-in bar widget." }
     else if (!automationEnabled) { activeRule = "Disabled"; ruleReason = "Automation is off." }
     else if (Date.now() < manualUntil) {
       activeRule = "Manual override"
@@ -88,7 +130,7 @@ Item {
 
   function dispatch() {
     updateRule()
-    if (writer.running || suspended || !presenceKnown) return
+    if (writer.running || !writer.handled || suspended || !presenceKnown) return
     // Do not retry HID writes while absent or permission denied. Manual calls
     // still complete so the panel does not get stuck waiting for a callback.
     if (!connected || !writable) {
@@ -108,9 +150,10 @@ Item {
       manualQueue = manualQueue.slice(1)
       writer.requestId = request.requestId
       args = request.args.concat(["--origin", "panel"])
-    } else if (reconnectPending) {
+    } else if (!automaticWritesAllowed) return
+    else if (reconnectPending) {
       reconnectPending = false
-      if (!restoreOnReconnect) return
+      if (!restoreOnReconnect || Date.now() < manualUntil) return
       args = ["restore", "--origin", "signal"]
       writer.rule = "reconnect"
     } else if (rulesLoaded && automationEnabled && Date.now() >= manualUntil && appliedRule !== activeRule) {
@@ -126,6 +169,7 @@ Item {
     writer.output = ""
     writer.error = ""
     writer.handled = false
+    writer.attempt += 1
     writer.command = [binary].concat(args)
     writer.running = true
   }
@@ -133,7 +177,16 @@ Item {
   onFullscreenChanged: schedule()
   onActiveToplevelChanged: schedule()
   onSuspendedChanged: schedule()
-  onBinaryChanged: { rulesLoaded = false; presenceKnown = false; appliedRule = ""; reloadState() }
+  onBinaryChanged: {
+    controllerGeneration += 1
+    rulesLoaded = false
+    automationEnabled = false
+    restoreOnReconnect = false
+    presenceKnown = false
+    reconnectPending = false
+    appliedRule = ""
+    reloadState()
+  }
   Component.onCompleted: reloadState()
 
   Connections {
@@ -146,7 +199,7 @@ Item {
   IdleMonitor {
     id: idleMonitor
     timeout: 300
-    enabled: root.automationEnabled
+    enabled: root.automationEnabled && root.automaticWritesAllowed
     respectInhibitors: true
     onIsIdleChanged: root.schedule()
   }
@@ -162,18 +215,24 @@ Item {
     property string output: ""
     property string error: ""
     property bool handled: true
-    command: [root.binary, "rules", "--json"]
+    property int generation: -1
+    property int attempt: 0
     stdout: StdioCollector { onStreamFinished: rulesProc.output = String(text || "") }
     stderr: StdioCollector { onStreamFinished: rulesProc.error = String(text || "").trim() }
     onExited: function(code) {
-      Qt.callLater(function() { root.finishRulesRead(code) })
+      var completedAttempt = attempt
+      Qt.callLater(function() { root.finishRulesRead(code, completedAttempt) })
     }
     onRunningChanged: if (!running && !handled) rulesReadFailureGuard.restart()
   }
-  function finishRulesRead(code) {
-    if (rulesProc.handled) return
+  function finishRulesRead(code, attempt) {
+    if (rulesProc.handled || attempt !== rulesProc.attempt) return
     rulesProc.handled = true
     rulesReadFailureGuard.stop()
+    if (rulesProc.generation !== controllerGeneration) {
+      startRulesRead()
+      return
+    }
     root.rulesLoaded = false
     try {
       if (code !== 0) throw new Error("unavailable")
@@ -188,26 +247,34 @@ Item {
         : rulesProc.error || "Controller unavailable. Open Setup to install or verify it."
     }
     root.schedule()
+    startRulesRead()
   }
   Timer {
     id: rulesReadFailureGuard
     interval: 100
-    onTriggered: if (!rulesProc.running && !rulesProc.handled) root.finishRulesRead(1)
+    onTriggered: if (!rulesProc.running && !rulesProc.handled) root.finishRulesRead(1, rulesProc.attempt)
   }
   Process {
     id: rulesWrite
     property string error: ""
     property bool handled: true
+    property int generation: -1
+    property int attempt: 0
     stderr: StdioCollector { onStreamFinished: rulesWrite.error = String(text || "").trim() }
     onExited: function(code) {
-      Qt.callLater(function() { root.finishRulesWrite(code) })
+      var completedAttempt = attempt
+      Qt.callLater(function() { root.finishRulesWrite(code, completedAttempt) })
     }
     onRunningChanged: if (!running && !handled) rulesWriteFailureGuard.restart()
   }
-  function finishRulesWrite(code) {
-    if (rulesWrite.handled) return
+  function finishRulesWrite(code, attempt) {
+    if (rulesWrite.handled || attempt !== rulesWrite.attempt) return
     rulesWrite.handled = true
     rulesWriteFailureGuard.stop()
+    if (rulesWrite.generation !== controllerGeneration) {
+      startRulesRead()
+      return
+    }
     root.appliedRule = ""
     if (code !== 0) {
       root.rulesLoaded = false
@@ -217,27 +284,34 @@ Item {
       root.checkPresence()
       root.schedule()
     } else root.reloadState()
+    startRulesRead()
   }
   Timer {
     id: rulesWriteFailureGuard
     interval: 100
-    onTriggered: if (!rulesWrite.running && !rulesWrite.handled) root.finishRulesWrite(1)
+    onTriggered: if (!rulesWrite.running && !rulesWrite.handled) root.finishRulesWrite(1, rulesWrite.attempt)
   }
   Process {
     id: presenceProc
     property string output: ""
     property bool handled: true
-    command: [root.binary, "dev", "--json"]
+    property int generation: -1
+    property int attempt: 0
     stdout: StdioCollector { onStreamFinished: presenceProc.output = String(text || "") }
     onExited: function(code) {
-      Qt.callLater(function() { root.finishPresence(code) })
+      var completedAttempt = attempt
+      Qt.callLater(function() { root.finishPresence(code, completedAttempt) })
     }
     onRunningChanged: if (!running && !handled) presenceFailureGuard.restart()
   }
-  function finishPresence(code) {
-    if (presenceProc.handled) return
+  function finishPresence(code, attempt) {
+    if (presenceProc.handled || attempt !== presenceProc.attempt) return
     presenceProc.handled = true
     presenceFailureGuard.stop()
+    if (presenceProc.generation !== controllerGeneration) {
+      startPresenceRead()
+      return
+    }
     var wasKnown = root.presenceKnown
     var wasConnected = root.connected
     var wasWritable = root.writable
@@ -257,18 +331,23 @@ Item {
     root.presenceKnown = true
     if (!root.connected) root.reconnectPending = false
     if (wasKnown && !wasConnected && root.connected) {
-      root.reconnectPending = root.restoreOnReconnect
+      root.reconnectPending = root.automaticWritesAllowed && root.restoreOnReconnect
       // Recovery is opt-in. Do not turn a presence transition into a
       // second automation write (or an implicit restore when disabled).
       root.updateRule()
       root.appliedRule = root.activeRule
-    } else if (wasConnected && root.connected && !wasWritable && root.writable) root.appliedRule = ""
+    } else if (wasConnected && root.connected && !wasWritable && root.writable) {
+      // A queued reconnect already consumed this rule. Permission recovery
+      // must not re-arm it and produce a second write after the restore.
+      if (!root.reconnectPending) root.appliedRule = ""
+    }
     root.schedule()
+    startPresenceRead()
   }
   Timer {
     id: presenceFailureGuard
     interval: 100
-    onTriggered: if (!presenceProc.running && !presenceProc.handled) root.finishPresence(1)
+    onTriggered: if (!presenceProc.running && !presenceProc.handled) root.finishPresence(1, presenceProc.attempt)
   }
   Process {
     id: writer
@@ -277,16 +356,19 @@ Item {
     property string requestId: ""
     property string rule: ""
     property bool handled: true
+    property int attempt: 0
     stdout: StdioCollector { onStreamFinished: writer.output = String(text || "").trim() }
     stderr: StdioCollector { onStreamFinished: writer.error = String(text || "").trim() }
     onExited: function(code) {
-      Qt.callLater(function() { root.finishWrite(code) })
+      var completedAttempt = attempt
+      Qt.callLater(function() { root.finishWrite(code, completedAttempt) })
     }
     onRunningChanged: if (!running && !handled) writerFailureGuard.restart()
   }
-  function finishWrite(code) {
-    if (writer.handled) return
+  function finishWrite(code, attempt) {
+    if (writer.handled || attempt !== writer.attempt) return
     writer.handled = true
+    writerFailureGuard.stop()
     lastWriteFinished = Date.now()
     lastOutcome = code === 0 ? (writer.output || "Command completed") : (writer.error || "Could not start or complete the controller command")
     if (writer.requestId !== "") panelCommandFinished(writer.requestId, code, writer.error || (code !== 0 ? lastOutcome : ""), writer.output)
@@ -296,6 +378,6 @@ Item {
   Timer {
     id: writerFailureGuard
     interval: 100
-    onTriggered: if (!writer.running && !writer.handled) root.finishWrite(1)
+    onTriggered: if (!writer.running && !writer.handled) root.finishWrite(1, writer.attempt)
   }
 }

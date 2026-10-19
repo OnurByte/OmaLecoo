@@ -98,6 +98,8 @@ settings once after reconnect** for one `restore --origin signal` after a
 reconnect. The service suppresses writes while the device is absent or denied.
 
 Automation and service-driven recovery require **Omarchy's built-in bar**.
+The service only sends automatic or recovery commands while a built-in bar
+widget is attached; removing the last widget cancels pending recovery.
 Replacement bars can retain manual controls, but do not provide this service
 integration.
 
@@ -106,7 +108,7 @@ integration.
 **HID Blackbox** records OmaLecoo's vendor-HID exchanges with UTC timestamps,
 origin (`panel`, `signal`, or `cli`), report bytes, syscall return/error, and a
 short outcome. The panel shows the newest 40 entries; `blackbox --json` reads
-the retained history, newest first.
+the retained history, newest first, skipping malformed JSON entries.
 
 The current `blackbox.jsonl` rotates at 1 MiB and retains one previous file,
 `blackbox.jsonl.1`. Recording is best-effort: a log failure does not turn a

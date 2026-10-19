@@ -17,6 +17,7 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property var signalService: bar && bar.shell && typeof bar.shell.serviceFor === "function"
     ? bar.shell.serviceFor(root.moduleName) : null
+  property var attachedService: null
 
   // ---- popup lifecycle, in the shape the bar's popout coordinator expects
   //      (open / close / opened on the widget root).
@@ -29,6 +30,10 @@ BarWidget {
   function closeForPopoutSwitch() { if (panel) panel.closeForPopoutSwitch() }
 
   function injectPanel() {
+    if (attachedService && attachedService !== signalService) {
+      attachedService.detachWidget(root)
+      attachedService = null
+    }
     var target = panelLoader.item
     if (!target) return
     if ("bar" in target) target.bar = root.bar
@@ -36,7 +41,13 @@ BarWidget {
     if ("anchorItem" in target) target.anchorItem = button
     if ("hostWidget" in target) target.hostWidget = root
     if ("signalService" in target) target.signalService = root.signalService
-    if (root.signalService) root.signalService.binary = target.binary
+    if (root.signalService) {
+      root.signalService.binary = target.binary
+      if (attachedService !== signalService) {
+        signalService.attachWidget(root)
+        attachedService = signalService
+      }
+    }
   }
 
   implicitWidth: button.implicitWidth
@@ -45,6 +56,7 @@ BarWidget {
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
   onSignalServiceChanged: injectPanel()
+  Component.onDestruction: if (attachedService) attachedService.detachWidget(root)
 
   // The panel owns the device logic; it stays loaded (but invisible) so the
   // bar's tooltip always has fresh state to show.
