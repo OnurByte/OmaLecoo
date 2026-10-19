@@ -47,12 +47,12 @@
 - Produces `lecoo-gk301 state clear` for explicitly requested state cleanup.
 - Produces `lecoo-gk301 udev install|remove`, allowed only as root, limited to `/etc/udev/rules.d/70-lecoo-gk301.rules`, and followed by udev reload/trigger.
 
-- [ ] **Step 1: Add typed rules parsing, defaults, and atomic persistence** in `src/main.rs`; malformed files load the all-disabled defaults.
-- [ ] **Step 2: Add device-presence JSON output** using existing device discovery without opening a HID report path or sending a command.
-- [ ] **Step 3: Add bounded structured Blackbox recording and JSON output**; record UTC time, origin, report bytes, syscall outcome, and concise result.
-- [ ] **Step 4: Thread command origin through HID writes** while preserving current command lock and 110 ms protocol pacing.
-- [ ] **Step 5: Add explicit state cleanup and root-only udev install/remove commands** with exact-content ownership checks before deleting a rule.
-- [ ] **Step 6: Run `cargo fmt --check` and `cargo check --all-targets`**; resolve compile or formatting errors without adding a non-Rust test harness.
+- [x] **Step 1: Add typed rules parsing, defaults, and atomic persistence** in `src/main.rs`; malformed files load the all-disabled defaults.
+- [x] **Step 2: Add device-presence JSON output** using existing device discovery without opening a HID report path or sending a command.
+- [x] **Step 3: Add bounded structured Blackbox recording and JSON output**; record UTC time, origin, report bytes, syscall outcome, and concise result.
+- [x] **Step 4: Thread command origin through HID writes** while preserving current command lock and 110 ms protocol pacing.
+- [x] **Step 5: Add explicit state cleanup and root-only udev install/remove commands** with exact-content ownership checks before deleting a rule.
+- [x] **Step 6: Run `cargo fmt --check` and `cargo check --all-targets`**; resolve compile or formatting errors without adding a non-Rust test harness.
 
 ### Task 2: Quickshell service, panel controls, and lifecycle
 
@@ -70,13 +70,13 @@
 - Device presence is checked every 10 seconds. Reconnect sends one `restore --origin signal` only when recovery is enabled.
 - The panel starts Cargo, pkexec, and Omarchy commands as fixed argument arrays, never a shell-assembled command string.
 
-- [ ] **Step 1: Register one `service` and one `bar-widget` manifest entry point** using the existing plugin id and root plugin layout.
-- [ ] **Step 2: Implement the persistent service** with safe startup defaults, rule arbitration, event coalescing, manual override expiry, and reconnect recovery.
-- [ ] **Step 3: Expose the service to the bar widget and panel** through the documented scoped service lookup, with null-safe behavior when running under a replacement bar.
-- [ ] **Step 4: Add an automation section and Ghost Mode status** to `Panel.qml`, including the active rule reason and a truthful disconnected/permission-denied message.
-- [ ] **Step 5: Add the Blackbox diagnostics view** with timestamp, origin, report bytes, and outcome; label firmware replies as acknowledgements.
-- [ ] **Step 6: Add setup and uninstall panels**: source install into `~/.local`, explicit polkit authorization, a second removal confirmation, optional state/udev cleanup, Cargo uninstall, and detached Omarchy plugin removal.
-- [ ] **Step 7: Run `omarchy plugin validate .` when available and inspect QML/manifest diffs**; otherwise report the missing validator and perform static manifest/QML review.
+- [x] **Step 1: Register one `service` and one `bar-widget` manifest entry point** using the existing plugin id and root plugin layout.
+- [x] **Step 2: Implement the persistent service** with safe startup defaults, rule arbitration, event coalescing, manual override expiry, and reconnect recovery.
+- [x] **Step 3: Expose the service to the bar widget and panel** through the documented scoped service lookup, with null-safe behavior when running under a replacement bar.
+- [x] **Step 4: Add an automation section and Ghost Mode status** to `Panel.qml`, including the active rule reason and a truthful disconnected/permission-denied message.
+- [x] **Step 5: Add the Blackbox diagnostics view** with timestamp, origin, report bytes, and outcome; label firmware replies as acknowledgements.
+- [x] **Step 6: Add setup and uninstall panels**: source install into `~/.local`, explicit polkit authorization, a second removal confirmation, optional state/udev cleanup, Cargo uninstall, and detached Omarchy plugin removal.
+- [x] **Step 7: Run `omarchy plugin validate .` when available and inspect QML/manifest diffs**; otherwise report the missing validator and perform static manifest/QML review.
 
 ### Task 3: Distinctive README and release notes
 
@@ -88,8 +88,8 @@
 - README installation, CLI and removal examples must match the commands from Tasks 1 and 2.
 - Feature claims must distinguish confirmed hardware behavior, new software behavior, and unsupported hardware behavior.
 
-- [ ] **Step 1: Rebuild the opening as a strong product landing page** with a concise identity, native Omarchy use case, and clear feature snapshot.
-- [ ] **Step 2: Add a factual capability table and compact packet map** that preserve all current evidence limits.
-- [ ] **Step 3: Explain the setup flow, Cargo prerequisite, polkit udev authorization, in-panel removal choices, preserved state, and privacy boundary.**
-- [ ] **Step 4: Link protocol and hardware claims directly to the existing evidence documents** and document a real preview/screenshot path without inventing product screenshots.
-- [ ] **Step 5: Run `git diff --check`, inspect all changed docs against the CLI and manifest, and review the final diff.**
+- [x] **Step 1: Rebuild the opening as a strong product landing page** with a concise identity, native Omarchy use case, and clear feature snapshot.
+- [x] **Step 2: Add a factual capability table and compact packet map** that preserve all current evidence limits.
+- [x] **Step 3: Explain the setup flow, Cargo prerequisite, polkit udev authorization, in-panel removal choices, preserved state, and privacy boundary.**
+- [x] **Step 4: Link protocol and hardware claims directly to the existing evidence documents** and document a real preview/screenshot path without inventing product screenshots.
+- [x] **Step 5: Run `git diff --check`, inspect all changed docs against the CLI and manifest, and review the final diff.**
