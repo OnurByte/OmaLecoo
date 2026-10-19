@@ -5,7 +5,6 @@ package and plugin manifest. This document records implementation checks and
 historical release notes; it does not announce publication of v1.5.0.
 
 ## The FN lighting zones and the loader byte — 20 October 2026
-
 The keyboard lights a different key group for each of its own FN+1 … FN+9
 keys. A live usbmon capture (control transfers only, raw file deleted right
 after filtering) and a REA pass over the original Windows tool settled what
@@ -28,6 +27,30 @@ The plugin therefore keeps the loader at M1/M2/M3, exactly the three values
 the original tool exposed, and the `game` preset and the fullscreen rule
 apply `Gaming Special Key` so they light whichever group the keyboard is
 in.
+
+Two further results from the same session:
+
+- The **loader has no confirmed visible effect**. A repeated A/B run with the
+  same brightness and speed showed no change for M1 or M2 and a visible
+  change for M3. The panel labels the control *Loader* and says its effect
+  was not confirmed, instead of presenting it as a zone selector.
+- The **original Windows tool does not select zones either**. Its
+  `HidDevice::SetOutputReport` method is present in the binary (log tag
+  `0x692cc0`, implementation `0x4050e0`) but the complete disassembly has
+  five calls into the `SetFeature` wrapper and none into the output path.
+  The vendor interface's report ID 7 does declare an Output item, so a
+  channel exists; nothing recovered uses it.
+
+The keyboard's ten lighting layouts are now their own model
+(`src/zones.rs`, `lecoo-gk301 zones list`, and the panel's *Gaming zones*
+section), separate from the loader: FN+1 FPS 1, FN+2 FPS 2, FN+3 COD, FN+4
+RTS, FN+5 LOL, FN+6 Racing, FN+7 NBA, FN+8 LOL II, FN+9 Custom I, FN+0
+Custom II.
+
+The lighting write path was also tightened: a panel command now has to move
+exactly one eight-byte report, and a short transfer is a failure, the same
+rule the firmware query already used. A successful transfer still only means
+the device accepted the report, never that the LEDs changed.
 
 ## Panel fixes and the missing features — 20 October 2026
 

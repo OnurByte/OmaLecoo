@@ -85,6 +85,7 @@ Usage:\n\
   lecoo-gk301 list                         effect names\n\
   lecoo-gk301 macro list|save|remove|play|import|export   lighting macros\n\
   lecoo-gk301 keys list|set|export         GK301 function keys and Hyprland binds\n\
+  lecoo-gk301 zones list [--json]           the keyboard's own FN lighting zones\n\
 \n\
 Options: --device /dev/hidrawN (or LECOO_DEVICE)\n\
          --origin <panel|signal> for HID commands (optional; default: cli)\n\

@@ -196,6 +196,30 @@ lecoo-gk301 keys set "Calculator" --command "omacalc"
 lecoo-gk301 keys export
 ```
 
+## Gaming zones: what the keyboard owns
+
+The GK301 keeps ten lighting layouts in its own controller and its
+**FN+1 … FN+0** keys pick one: FPS 1, FPS 2, COD, RTS, LOL, Racing, NBA,
+LOL II, Custom I and Custom II. Pressing FN+1 lights ESC, WASD and the
+arrow keys; FN+2 lights TAB, SHIFT, CTRL, QWER, HOME, PRTSC, SCRLK, PGUP,
+END and PGDN.
+
+**The host cannot choose a zone.** The recovered report has no field for it,
+the original Windows tool does not send one either, and the keyboard keeps
+the chosen zone across host commands. What the plugin can do is re-apply the
+**Gaming Special Key** effect — that is what the **Game** preset and the
+fullscreen rule do — and the keyboard then lights whichever zone its own FN
+key last selected.
+
+The **M1 / M2 / M3 loader** is a different thing: it is the original tool's
+own control, it travels in the same report, and its effect on this unit was
+not confirmed. The panel shows it under the name *Loader* and says so.
+
+```bash
+lecoo-gk301 zones list          # the ten hardware layouts
+lecoo-gk301 zones list --json
+```
+
 ## See what was sent
 
 **HID Blackbox** records OmaLecoo's vendor-HID exchanges with UTC timestamps,
@@ -225,7 +249,7 @@ schedule the existing packets; it does not add new keyboard capabilities.
 | Brightness 0–13 | Windows UI clamps to 5; its stored record carries 13. The user confirmed a visible difference between 5 and 13. [Experiment](docs/captures/extended-brightness-experiment.md). |
 | Speed 0–2; Gaming M1/M2 | Recovered main-panel mapping: speed for effects 2–19, game-key selection for effect 1. [Analysis](docs/FINAL-ANALYSIS.md). |
 | Presets, rotation, restore | Software compositions of the existing main-panel command. No extra packet family or on-device preset storage is claimed. |
-| Gaming Special Key, M1/M2/M3 | The loader byte is the original tool's M1/M2/M3 value. The keyboard's own FN+1 … FN+9 keys pick the lit key group and the host cannot change it; the **Game** preset re-applies that lighting. [Capture and analysis](docs/captures/lighting-zone-capture.md). |
+| Gaming Special Key, M1/M2/M3 | The loader byte is the original tool's M1/M2/M3 value; the keyboard's reaction to it is not confirmed. The keyboard's own FN+1 … FN+0 keys pick the lit key group, and the controller cannot choose it. [Capture and analysis](docs/captures/lighting-zone-capture.md). |
 | Factory defaults | `restore --factory` applies the same default record the Windows tool starts with, and makes it the new manual state. |
 | Signal Engine, Blackbox, Ghost Mode | Implemented software features; static/build checks and live-validation limits are listed in [verification](docs/verification.md). |
 | Firmware response | Validated F1 reply contains firmware data. The tested GET path does not report current lighting. [Readback experiment](docs/FINAL-ANALYSIS.md#new-readback-experiment). |

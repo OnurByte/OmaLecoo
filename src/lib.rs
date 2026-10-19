@@ -15,6 +15,7 @@
 //! | [`udev`] | The single owned udev rule and its install/remove path |
 //! | [`macros`] | Named lighting sequences and their playback |
 //! | [`keys`] | The GK301 function keys and the Hyprland fragment for them |
+//! | [`zones`] | The keyboard's own FN lighting zones, documented not written |
 //! | [`cli`] | Argument parsing helpers and the usage text |
 //! | [`commands`] | Command implementations behind one dispatch function |
 //! | [`probe`] | Hidden research diagnostics (brightness sweep, startup replay) |
@@ -42,3 +43,4 @@ pub mod state;
 pub mod sys;
 pub mod transport;
 pub mod udev;
+pub mod zones;

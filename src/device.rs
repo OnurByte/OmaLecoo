@@ -70,6 +70,11 @@ impl Device {
     }
 
     /// Sends one main-panel command.
+    ///
+    /// The transfer must move exactly one report. A short transfer is a
+    /// failure, not a partial write: the same rule the firmware query uses.
+    /// A successful transfer still only means the device accepted the report,
+    /// never that the LEDs changed.
     pub fn set_feature(&self, payload: [u8; 7], origin: &str) -> io::Result<()> {
         self.set_feature_counted(payload, origin).map(|_| ())
     }
@@ -81,7 +86,13 @@ impl Device {
         buf[1..].copy_from_slice(&payload);
         let result = self.transport.set_feature(&mut buf);
         let (rc, error) = match result {
-            Ok(n) => (n as i32, None),
+            Ok(n) if n == REPORT_SIZE => (n as i32, None),
+            Ok(n) => (
+                n as i32,
+                Some(io::Error::other(format!(
+                    "short transfer ({n} bytes, expected {REPORT_SIZE})"
+                ))),
+            ),
             Err(error) => (-1, Some(error)),
         };
         debug_log(&format!(
@@ -98,12 +109,21 @@ impl Device {
     }
 
     /// Reads one feature report.
+    ///
+    /// A short read is a failure for the same reason the write path treats a
+    /// short write as one.
     pub fn get_feature(&self, origin: &str) -> io::Result<[u8; REPORT_SIZE]> {
         let mut buf = [0u8; REPORT_SIZE];
         buf[0] = REPORT_ID;
         let result = self.transport.get_feature(&mut buf);
         let (rc, error) = match result {
-            Ok(n) => (n as i32, None),
+            Ok(n) if n == REPORT_SIZE => (n as i32, None),
+            Ok(n) => (
+                n as i32,
+                Some(io::Error::other(format!(
+                    "short transfer ({n} bytes, expected {REPORT_SIZE})"
+                ))),
+            ),
             Err(error) => (-1, Some(error)),
         };
         debug_log(&format!(

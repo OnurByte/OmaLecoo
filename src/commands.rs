@@ -331,6 +331,7 @@ pub fn dispatch(args: &[String]) -> Result<(), String> {
         "probe-startup" => probe_startup(args, device, origin)?,
         "macro" => macro_command(args, device, origin)?,
         "keys" => keys_command(args)?,
+        "zones" => zones_command(args)?,
         other => {
             return Err(format!("unknown command: {}\n\nlecoo-gk301 --help", other));
         }
@@ -526,6 +527,36 @@ fn keys_command(args: &[String]) -> Result<(), String> {
         other => {
             return Err(format!(
                 "unknown keys action: {}\n\nlecoo-gk301 keys list|set|export",
+                other
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// `zones list`
+///
+/// The keyboard's own lighting zones. They live in the keyboard and the
+/// recovered report has no field for them, so this command only lists them.
+fn zones_command(args: &[String]) -> Result<(), String> {
+    let action = args
+        .get(1)
+        .map(String::as_str)
+        .ok_or("usage: lecoo-gk301 zones list")?;
+    match action {
+        "list" => {
+            if has_flag(args, "--json") {
+                println!("{}", crate::zones::list_json());
+            } else {
+                for zone in crate::zones::list() {
+                    println!("{:<6} {:<10} {}", zone.key, zone.name, zone.lights);
+                }
+                println!("\nThe zone is chosen on the keyboard; the controller cannot set it.");
+            }
+        }
+        other => {
+            return Err(format!(
+                "unknown zones action: {}\n\nlecoo-gk301 zones list",
                 other
             ))
         }

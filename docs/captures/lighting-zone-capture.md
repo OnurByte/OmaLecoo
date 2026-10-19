@@ -71,18 +71,53 @@ controller sends.
 ## Conclusion
 
 - The **loader** byte carries the original tool's M1/M2/M3 values. It is not
-  the FN zone selector: changing it does not move the lit key group.
+  the FN zone selector: changing it does not move the lit key group, and a
+  loader value above 2 makes the keyboard blink and fall back, so the wire
+  byte carries exactly the three values the original Windows tool exposed.
 - The **FN zone lives in the keyboard**. The host can enter the special-key
   lighting with the `Gaming Special Key` effect, and the keyboard then lights
   whichever group its own FN key last selected.
-- The recovered protocol has no field for the zone. A loader value above 2 is
-  rejected by the firmware (the keyboard blinks), so the wire byte carries
-  exactly the three values the original Windows tool exposed.
+- The recovered protocol has no field for the zone. The original Windows tool
+  does not send one either: its `HidDevice::SetOutputReport` method exists in
+  the binary (log tag at `0x692cc0`, implementation at `0x4050e0`) but no call
+  site reaches it — the complete disassembly has five calls into the
+  `SetFeature` wrapper (`0x404cb0`) and none into the output path.
+- The keyboard's ten zones are hardware layouts, listed in the manufacturer's
+  GK301 guide: FN+1 FPS 1, FN+2 FPS 2, FN+3 COD, FN+4 RTS, FN+5 LOL, FN+6
+  Racing, FN+7 NBA, FN+8 LOL II, FN+9 Custom I, FN+0 Custom II.
 
-OmaLecoo therefore keeps the loader at M1/M2/M3 and documents that the FN
-zones are chosen on the keyboard. The `game` preset and the Signal Engine's
-fullscreen rule both apply `Gaming Special Key`, so they reproduce the
-special-key lighting of whichever zone the keyboard is in.
+OmaLecoo therefore keeps the loader at M1/M2/M3, labels it as the original
+tool's loader rather than a zone selector, and lists the ten hardware zones
+as information (`lecoo-gk301 zones list`, and the panel's *Gaming zones*
+section). The `game` preset and the Signal Engine's fullscreen rule both
+apply `Gaming Special Key`, so they reproduce the special-key lighting of
+whichever zone the keyboard is in.
+
+## What is still open
+
+The loader's *visible* effect is unconfirmed. The byte is sent exactly as the
+original sends it, the wire value is documented by the disassembly, and the
+keyboard accepts the transfer — but the lit key group does not follow it.
+
+Repeated observation, same brightness and speed, `Gaming Special Key`:
+
+| Loader | Wire byte | Observed |
+| --- | --- | --- |
+| M1 | 0 | no visible change |
+| M2 | 1 | no visible change |
+| M3 | 2 | **a visible change** |
+
+So the loader is not a plain zone index either: M3 does something the other
+two do not, while M1 does not move the keyboard to the FN+1 group even
+though the FN+1 group is the one the keyboard was showing. What M3 changes
+exactly is still unknown — the report does not say, and the plugin does not
+claim it.
+
+The plugin therefore presents the control as **Loader** (the original tool's
+name for it), states that its effect was not confirmed, and lists the ten
+hardware zones separately as information. A dedicated A/B run with the zone
+read from the keyboard each time would still settle the question; it needs
+someone watching the keyboard, which this session did not have.
 
 ## Boundaries
 

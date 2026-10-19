@@ -81,6 +81,9 @@ Panel {
   property string keyError: ""
   property string keyMessage: ""
 
+  // ---- the keyboard's own lighting zones (documentation, not a control) ----
+  property var zoneList: []
+
   // Extras the Windows app does not have.
   property bool autoCycle: false
   property int cycleSeconds: 60
@@ -145,6 +148,7 @@ Panel {
   // ---- macros ----
   function refreshMacros() { if (!macroProc.running) macroProc.running = true }
   function refreshKeys() { if (!keysProc.running) keysProc.running = true }
+  function refreshZones() { if (!zonesProc.running) zonesProc.running = true }
 
   // The scroll position the arrows and the wheel move towards. It is clamped
   // to the content, so the page can never be scrolled past its own height and
@@ -359,6 +363,7 @@ Panel {
     root.refresh()
     root.refreshInfo()
     root.refreshCargo()
+    root.refreshZones()
   }
 
   function open() {
@@ -564,6 +569,19 @@ Panel {
       root.keyError = ""
       root.keyMessage = keyActionProc.output
       root.refreshKeys()
+    }
+  }
+
+  // ---- the keyboard's own lighting zones ----
+  Process {
+    id: zonesProc
+    command: [root.binary, "zones", "list", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          root.zoneList = JSON.parse(String(text || "{}")).zones || []
+        } catch (e) { root.zoneList = [] }
+      }
     }
   }
 
@@ -975,9 +993,10 @@ Panel {
             }
           }
 
-          // ---------- loader (M1 / M2 / M3) ----------
-          // The loader is the original tool's own control for the keyboard's
-          // M1/M2/M3 key group. It rides in the same report as the effect.
+          // ---------- Windows loader (M1 / M2 / M3) ----------
+          // The original tool's loader values. They ride in the same report
+          // as the effect, and they are not a zone selector: changing them
+          // does not move the lit key group.
           Row {
             width: parent.width
             spacing: Style.space(8)
@@ -987,7 +1006,7 @@ Panel {
             Text {
               width: Style.space(88)
               height: Style.space(28)
-              text: "M1 / M2 / M3"
+              text: "Loader"
               color: Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
@@ -1010,7 +1029,50 @@ Panel {
 
           Note {
             width: parent.width
-            text: "M1, M2 and M3 are the original tool's loader values. The keyboard's own FN+1 … FN+9 keys pick which key group glows (FN+1 lights ESC, WASD and the arrow keys); that choice lives in the keyboard, and the recovered protocol has no field for it. The Game preset re-applies the Gaming Special Key effect, so the keyboard lights whichever group FN+N last selected."
+            text: "M1, M2 and M3 are the original Windows tool's loader values. They are not the key group that glows, and they were not confirmed to change anything on this unit — the loader byte carries them, the hardware's reaction is a separate question."
+          }
+
+          // ---------- gaming zones ----------
+          PanelSectionHeader {
+            width: parent.width
+            text: "GAMING ZONES"
+            foreground: Color.foreground
+          }
+
+          Note {
+            width: parent.width
+            text: "The keyboard keeps ten lighting layouts in its own controller and its FN+1 … FN+0 keys pick one. The recovered report has no field for them and the original tool does not send one, so the controller cannot choose a zone — it can only re-apply the Gaming Special Key effect, which lights the zone the keyboard last selected."
+          }
+
+          Repeater {
+            model: root.zoneList
+            delegate: Row {
+              required property var modelData
+              width: parent.width
+              spacing: Style.space(6)
+              Text {
+                width: Style.space(52)
+                text: String(modelData.key || "")
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+              Text {
+                width: Style.space(80)
+                text: String(modelData.name || "")
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+              Text {
+                width: parent.width - Style.space(138)
+                text: String(modelData.lights || "")
+                color: Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
+              }
+            }
           }
 
           // ---------- presets ----------
