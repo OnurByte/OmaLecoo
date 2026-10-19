@@ -1,0 +1,100 @@
+{
+  "commands": [
+    {
+      "command": [
+        "side",
+        "3",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 3/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "4",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 4/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "5",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 5/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "6",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 6/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "7",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 7/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "8",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 8/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "9",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 9/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "panel",
+        "0",
+        "--brightness",
+        "2",
+        "--speed",
+        "0",
+        "--select",
+        "0"
+      ],
+      "stdout": "panel: 0 (Steady) parlakl\u0131k 2/5 h\u0131z 0/2 se\u00e7im 0",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "side",
+        "2",
+        "--brightness",
+        "1"
+      ],
+      "stdout": "yan: 2/11 parlakl\u0131k 1/7",
+      "exit_code": 0
+    }
+  ],
+  "restored": true,
+  "limitation": "Successful HID transfer; visual LED color was not measured."
+}

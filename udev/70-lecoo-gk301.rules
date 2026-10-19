@@ -1,0 +1,2 @@
+# Lecoo GK301 (1a2c:9df4) vendor HID interface (report ID 7)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="9df4", ENV{ID_USB_INTERFACE_NUM}=="01", TAG+="uaccess"

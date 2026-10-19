@@ -1,0 +1,16 @@
+[package]
+name = "lecoo-gk301"
+version = "1.1.0"
+edition = "2021"
+description = "Lecoo GK301 keyboard RGB control (hidraw, report ID 7)"
+license = "MIT"
+
+[[bin]]
+name = "lecoo-gk301"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"

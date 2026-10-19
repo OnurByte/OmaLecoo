@@ -1,0 +1,48 @@
+{
+  "observed_at": "2026-10-19T15:54:10.047696+00:00",
+  "device": "/dev/hidraw5",
+  "prior_cache": {
+    "effect": 2,
+    "name": "Breathing",
+    "brightness": 5,
+    "speed": 0,
+    "select": 0,
+    "side_effect": 0,
+    "side_name": "Brilliant and brilliant",
+    "side_brightness": 7,
+    "panel_max": 19,
+    "panel_brightness_max": 5,
+    "speed_max": 2,
+    "select_max": 2,
+    "side_max": 11,
+    "side_brightness_max": 7
+  },
+  "operations": [
+    {
+      "operation": "set_feature",
+      "label": "firmware_query",
+      "bytes": "07 f1 00 00 00 00 00 00",
+      "rc": 8
+    },
+    {
+      "operation": "get_feature",
+      "label": "before_reapply",
+      "bytes": "07 01 16 00 00 00 00 00",
+      "rc": 8
+    },
+    {
+      "operation": "set_feature",
+      "label": "reapply_current_main_settings",
+      "bytes": "07 ff ff 02 05 00 00 00",
+      "rc": 8
+    },
+    {
+      "operation": "get_feature",
+      "label": "after_reapply_without_new_query",
+      "bytes": "07 01 16 00 00 00 00 00",
+      "rc": 8
+    }
+  ],
+  "same_response_before_and_after": true,
+  "limitation": "ioctl observations; compare against separately acquired usbmon capture. Same current effect was reapplied."
+}

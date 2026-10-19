@@ -1,0 +1,82 @@
+{
+  "observed_at": "2026-10-19T15:49:26.502257+00:00",
+  "method": "read-only sysfs descriptor inspection; not firmware extraction",
+  "interfaces": [
+    {
+      "node": "/dev/hidraw4",
+      "device_uevent": "DRIVER=hid-generic\nHID_ID=0003:00001A2C:00009DF4\nHID_NAME=SEMICO   USB Gaming Keyboard \nHID_PHYS=usb-0000:06:00.4-1/input0\nHID_UNIQ=\nMODALIAS=hid:b0003g0001v00001A2Cp00009DF4\n",
+      "descriptor_sha256": "5333cc3a23db1dd7a9e8303e2169a54a7070f69822fa503014834652c24410b6",
+      "descriptor_hex": "05 01 09 06 a1 01 05 07 19 e0 29 e7 15 00 25 01 75 01 95 08 81 02 95 01 75 08 81 01 95 05 75 01 05 08 19 01 29 05 91 02 95 01 75 03 91 01 95 06 75 08 15 00 26 ff 00 05 07 19 00 2a ff 00 81 00 c0",
+      "reports": [
+        {
+          "id": 0,
+          "kind": "input",
+          "bits": 64,
+          "wire_bytes_with_report_id": 8
+        },
+        {
+          "id": 0,
+          "kind": "output",
+          "bits": 8,
+          "wire_bytes_with_report_id": 1
+        }
+      ]
+    },
+    {
+      "node": "/dev/hidraw5",
+      "device_uevent": "DRIVER=hid-generic\nHID_ID=0003:00001A2C:00009DF4\nHID_NAME=SEMICO   USB Gaming Keyboard \nHID_PHYS=usb-0000:06:00.4-1/input1\nHID_UNIQ=\nMODALIAS=hid:b0003g0001v00001A2Cp00009DF4\n",
+      "descriptor_sha256": "422a5044992d4ca2505dbef47810bcb7fc19004cbedbf38bfd991928abefe376",
+      "descriptor_hex": "05 0c 09 01 a1 01 85 01 19 00 2a 80 03 15 00 26 80 03 95 01 75 10 81 00 c0 05 01 09 80 a1 01 85 02 19 81 29 83 15 00 25 01 75 01 95 03 81 02 95 05 81 01 c0 06 00 ff 09 01 a1 01 85 03 1a f1 00 2a f8 00 15 00 25 01 75 01 95 08 81 02 c0 05 01 09 06 a1 01 85 04 05 07 19 e0 29 e7 15 00 25 01 75 01 95 08 81 00 95 30 75 01 15 00 25 01 05 07 19 00 29 ff 81 02 c0 05 01 09 06 a1 01 85 05 95 38 75 01 15 00 25 01 05 07 19 30 29 67 81 02 c0 05 01 09 06 a1 01 85 06 95 38 75 01 15 00 25 01 05 07 19 68 29 9f 81 02 c0 06 01 ff 09 01 a1 01 85 07 09 03 15 00 26 ff 00 75 08 95 07 b1 02 09 04 15 00 26 ff 00 75 08 95 07 91 02 c0",
+      "reports": [
+        {
+          "id": 1,
+          "kind": "input",
+          "bits": 16,
+          "wire_bytes_with_report_id": 3
+        },
+        {
+          "id": 2,
+          "kind": "input",
+          "bits": 8,
+          "wire_bytes_with_report_id": 2
+        },
+        {
+          "id": 3,
+          "kind": "input",
+          "bits": 8,
+          "wire_bytes_with_report_id": 2
+        },
+        {
+          "id": 4,
+          "kind": "input",
+          "bits": 56,
+          "wire_bytes_with_report_id": 8
+        },
+        {
+          "id": 5,
+          "kind": "input",
+          "bits": 56,
+          "wire_bytes_with_report_id": 8
+        },
+        {
+          "id": 6,
+          "kind": "input",
+          "bits": 56,
+          "wire_bytes_with_report_id": 8
+        },
+        {
+          "id": 7,
+          "kind": "feature",
+          "bits": 56,
+          "wire_bytes_with_report_id": 8
+        },
+        {
+          "id": 7,
+          "kind": "output",
+          "bits": 56,
+          "wire_bytes_with_report_id": 8
+        }
+      ]
+    }
+  ]
+}
