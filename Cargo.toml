@@ -5,6 +5,10 @@ edition = "2021"
 description = "OmaLecoo — Lecoo GK301 keyboard RGB control for Omarchy (hidraw, report ID 7)"
 license = "MIT"
 
+[lib]
+name = "omalecoo"
+path = "src/lib.rs"
+
 [dependencies]
 serde_json = "1"
 

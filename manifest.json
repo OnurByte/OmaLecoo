@@ -5,7 +5,7 @@
   "version": "1.5.0",
   "author": "borat",
   "license": "MIT",
-  "description": "Lecoo GK301 keyboard RGB lighting controls for Omarchy",
+  "description": "Native Lecoo GK301 RGB lighting, brightness and event-aware automation for Omarchy",
   "kinds": [
     "service",
     "bar-widget"
@@ -16,7 +16,7 @@
   },
   "barWidget": {
     "displayName": "OmaLecoo",
-    "description": "Lecoo GK301 lighting effects, brightness and diagnostics",
+    "description": "Lecoo GK301 lighting effects, brightness, automation and diagnostics",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right",

@@ -4,6 +4,56 @@ Version `1.5.0` identifies the Signal Engine development line in the Cargo
 package and plugin manifest. This document records implementation checks and
 historical release notes; it does not announce publication of v1.5.0.
 
+## Rust-only cleanup — 20 October 2026
+
+The plugin is now Rust and Quickshell only. No standalone C, JavaScript/Node
+or Python implementation file remains in the repository.
+
+| Removed | Replacement |
+| --- | --- |
+| `install.sh` | The panel's **Setup** page: `cargo install --git … --root "$HOME/.local" --locked` with a fixed argument list, then `capabilities --json` verification. |
+| `scripts/install-udev.sh` | `lecoo-gk301 udev install` / `udev remove`, run through the panel's polkit action. |
+| `scripts/probe-windows-startup.py` | The hidden `lecoo-gk301 probe-startup [--send]` diagnostic in `src/probe.rs`. Display-only by default; `--send` replays the recovered startup record. |
+| `tests/ioctl_capture.c` | An in-process `HidTransport` substitution: `src/transport.rs` defines the trait, `tests/transport.rs` supplies the fixture. No `LD_PRELOAD`, no C compiler needed. |
+| `tests/ui-state.cjs` | Removed. It asserted a retired `--panel-only` routing flag and a `worker.command` shape that the current panel no longer has, so it could not validate the present panel. The stale-response handling it covered lives in `Panel.qml` and still needs a live session to verify. |
+| `udev/70-lecoo-gk301.rules` | The rule content now lives in `src/udev.rs` as the single source of truth. Two copies of the same rule could drift, and the install/remove path compares the file byte for byte before it touches it. |
+
+The Rust controller was split into focused modules: `protocol` and `transport`
+(the wire format), `device` (discovery and writes), `state` (saved settings
+and rules), `blackbox` (command history), `lock` (the shared process lock),
+`udev` (the owned rule), `cli` (argument helpers), `commands` (the command
+implementations), `probe` (hidden diagnostics) and `logging`. `src/lib.rs` is
+the library root; `src/main.rs` is now a thin binary that takes the lock and
+dispatches.
+
+The README gained a marketplace-facing landing page, an explicit
+**What this plugin touches** table (one privileged file, one user binary, one
+state directory) and a root `preview.png` — the banner the marketplace uses
+when it cannot find a supported preview. The banner is a project image, not a
+screenshot of the panel; `docs/assets/omalecoo-preview.svg` is its source.
+
+Checks for this cleanup: `cargo fmt --check`,
+`cargo check --all-targets --locked --offline`, `cargo build --release
+--locked --offline`, `omarchy plugin validate .`, the three-file QML parse
+and the service-only `qmllint` above, and `git diff --check` all passed. The
+release binary was also started for its local, device-free commands
+(`--help`, `capabilities --json`, `catalog --json`, `list`, `status --json`,
+`rules --json`, `dev --json`) and for the rejection of retired commands
+(`side`, `raw`, `reset`), with `XDG_STATE_HOME` pointed at a temporary
+directory. No test suite was run, and no live panel, polkit, install or
+uninstall flow was exercised.
+
+As a parity check, the previous monolithic `src/main.rs` was built as a
+separate crate and both binaries were run over the same command list. The
+outputs were identical for every command, including the usage text, the JSON
+reports, the retired-command rejections and the error strings. The only
+differences were the newly added `probe-startup` command, the measured
+firmware round-trip time, and the effect index of `next`/`prev`, which
+advanced the saved state between the two runs. That comparison ran against
+the connected keyboard, so it did send firmware queries and a few panel
+commands to the device; the saved manual lighting state was restored
+afterwards with `restore`.
+
 ## What changed in 1.5.0
 
 - **Signal Engine:** a Quickshell service and bar widget in one plugin. Rules
@@ -49,6 +99,7 @@ it passed on a particular revision:
 ```bash
 cargo fmt --check
 cargo check --all-targets
+cargo build --release
 omarchy plugin validate .
 git diff --check
 ```
@@ -69,9 +120,10 @@ be reported as successful semantic validation. Review those files with the
 installed Omarchy host contract and verify them in a live shell session.
 
 The CLI examples in the [README](../README.md#cli) were compared to the command
-parser in `src/main.rs`; setup/removal arguments were compared to `Panel.qml`,
-and service registration/version to `manifest.json`. This is static inspection,
-not execution of installation, removal or HID commands.
+parser in `src/cli.rs` and `src/commands.rs`; setup/removal arguments were
+compared to `Panel.qml`, and service registration/version to `manifest.json`.
+This is static inspection, not execution of installation, removal or HID
+commands.
 
 ## Recorded checks — 19 October 2026
 
@@ -112,7 +164,8 @@ live validation. Historical test results below do not validate these features.
   so the Git clone is a plugin folder. Added `license: "MIT"` and version
   `1.4.1` to the manifest.
 - `install.sh` built from source and skipped the plugin-copy step when run
-  from an Omarchy plugin checkout.
+  from an Omarchy plugin checkout. That script was removed in the Rust-only
+  cleanup of 20 October 2026; the panel's Setup page took over the role.
 - README documented the marketplace install command, separate Cargo/prebuilt
   controller options and brightness 0–13. The earlier release record states
   that v1.4.1 was published with an x86_64 binary and `checksums.txt`; no v1.5
@@ -124,7 +177,9 @@ live validation. Historical test results below do not validate these features.
   last applied settings. Profile JSON was no longer read or written.
 - Replaced Python offline integration and transport harnesses with Rust tests,
   preserving the existing C interception shim. The brightness probe became
-  the hidden `lecoo-gk301 probe-brightness` diagnostic.
+  the hidden `lecoo-gk301 probe-brightness` diagnostic. The C shim itself was
+  replaced by the in-process transport substitution in the Rust-only cleanup
+  of 20 October 2026.
 - Fixed brightness text to `/13` and catalog `panel_brightness_max` to 13.
 
 ## Historical — 1.3.0 (extended brightness)

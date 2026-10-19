@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="preview.png" alt="OmaLecoo — native Lecoo GK301 RGB control for Omarchy" width="900">
+
 # OmaLecoo
 
 ### Your GK301, at home in Omarchy.
@@ -9,7 +11,7 @@
 Native bar controls and an event-aware lighting service for the Lecoo GK301.
 Built with **Rust + Quickshell** for SEMICO **`1a2c:9df4`**.
 
-**v1.5.0 development** · [Setup](#setup) · [Preview](#preview-it-in-omarchy) · [Evidence](#follow-the-evidence) · [CLI](#cli)
+`v1.5.0 development` · [Setup](#setup) · [What it touches](#what-this-plugin-touches) · [CLI](#cli)
 
 </div>
 
@@ -17,15 +19,36 @@ Built with **Rust + Quickshell** for SEMICO **`1a2c:9df4`**.
 > manual adjustment takes priority for 30 minutes. Enable Signal Engine when
 > you want your keyboard to follow your desktop.
 
+```bash
+omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
+```
+
+The repository root **is** the plugin folder. Omarchy loads the bar widget and
+the service, then the panel walks you through the two remaining steps.
+
 | Signal Engine | HID Blackbox | Ghost Mode |
 | --- | --- | --- |
 | Opt-in fullscreen and idle rules, with the active reason shown in the panel. | UTC time, command origin, report bytes and syscall outcome, stored locally. | Muted cached settings while disconnected, with optional one-time recovery on reconnect. |
 
+No daemon. No second Quickshell process. No network calls. The panel and the
+CLI talk to the keyboard through one small Rust controller that serializes
+every write behind a single lock.
+
+---
+
+## Why this exists
+
+The GK301 ships with a Windows-only utility. Its lighting protocol was never
+documented, so OmaLecoo recovered it: static disassembly of the official
+tool, a usbmon capture of real traffic, and confirmation on the physical
+keyboard. The write-up lives in [`docs/`](docs/FINAL-ANALYSIS.md).
+
 The lighting protocol comes from reverse engineering the official Windows
 controller, matching USB control captures, and asking the user what the
-physical LEDs actually did. The new service builds on those existing commands;
-its runtime and reconnect behavior still need live validation. See the
-[verification record](docs/verification.md) for the checks performed so far.
+physical LEDs actually did. The v1.5 service builds on those existing
+commands; its runtime and reconnect behavior still need live validation. See
+the [verification record](docs/verification.md) for the checks performed so
+far.
 
 ## Setup
 
@@ -35,9 +58,9 @@ Install and enable the Omarchy plugin:
 omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
 ```
 
-The repository root is the plugin folder. Omarchy loads its bar widget and
-service, but does not run an installation hook. **Left-click the keyboard icon
-and open Setup** to install the controller and authorize device access.
+**Left-click the keyboard icon in the bar and open Setup.** The repository
+root is the plugin folder. Omarchy loads its bar widget and service, but does
+not run an installation hook.
 
 1. **Provide Rust and Cargo.** If Setup reports that Cargo is missing, its
    prerequisite command is `omarchy pkg add rust`. After installing it, select
@@ -71,6 +94,27 @@ lighting controls run as your user after authorization.
 Both Git install commands follow the repository's default branch. This
 checkout identifies itself as v1.5.0 development; these notes do not announce
 a published v1.5 release or promise a v1.5 release asset.
+
+## What this plugin touches
+
+Everything OmaLecoo does outside your home directory, in one table. Nothing
+else is written, and no other plugin's configuration is modified.
+
+| Path | When | What it is |
+| --- | --- | --- |
+| `/etc/udev/rules.d/70-lecoo-gk301.rules` | Only in the polkit-authorized step | One udev rule granting your session access to the GK301 hidraw node. Exact-content checked: it is never overwritten with different content, and removal only deletes a file with the exact content it owns. |
+| `~/.local/bin/lecoo-gk301` | When you install the controller from source | The Rust controller. `cargo install --root "$HOME/.local"`, or any other path you choose. |
+| `~/.local/state/lecoo-gk301/` | While the plugin is used | `state.json` (your manual restore point), `rules.json` (automation settings), `blackbox.jsonl` (command history), `debug.log` and `command.lock`. |
+
+- **Privileged action:** exactly one — the polkit step that writes the udev
+  rule. It is invoked as `pkexec <controller> udev install` with a fixed
+  argument list, and the controller refuses to run unless it is root.
+- **Network:** none at runtime. The source installation step fetches the
+  repository through Cargo; the plugin itself never calls out.
+- **Input:** the controller only writes HID feature reports to the keyboard.
+  It never opens the keyboard's input stream and never records typed keys.
+- **Other plugins:** untouched. Omarchy's own plugin and bar settings are
+  read, never written.
 
 ## A keyboard that follows the desktop
 
@@ -168,11 +212,10 @@ its reason. Blackbox provides the command history behind the controls.
 Right-click the bar icon for the next effect; scroll for brightness. Panel
 shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
 
-This is the live preview path: the panel uses Omarchy's own UI components and
-runs in its shell. No product screenshots are checked into this revision.
-To capture the actual UI, open one of those pages in your installed Omarchy
-session and use its screenshot action. Hardware appearance still requires
-looking at the connected keyboard.
+The banner at the top of this page is a project image, not a screenshot of the
+panel. To capture the real interface, open one of those pages in your
+installed Omarchy session and use its screenshot action. Hardware appearance
+still requires looking at the connected keyboard.
 
 ## CLI
 
@@ -219,8 +262,9 @@ commands do not initiate that pause.
 The narrow maintenance commands are `lecoo-gk301 state clear` and
 `lecoo-gk301 udev install` / `lecoo-gk301 udev remove` (the latter require root,
 normally through the panel's polkit action). `side`, `raw` and `reset` are not
-product commands. The hidden `probe-brightness` diagnostic remains a research
-tool; historical documents may describe retired probes and controls.
+product commands. The hidden `probe-brightness` and `probe-startup`
+diagnostics remain research tools; historical documents may describe retired
+probes and controls.
 
 ## Removal, with choices
 
@@ -239,6 +283,11 @@ failure before proceeding to later steps. State cleanup leaves `command.lock`,
 backups and unrelated files in the state directory. Removing saved settings
 does not reset the physical keyboard's lighting.
 
+A controller installed outside `~/.local` — for example `cargo install` into
+`~/.cargo/bin`, or a manually placed binary — is not touched by the panel's
+uninstall, because the plugin cannot prove that such a file belongs to it.
+Remove those with the method you installed them with.
+
 ## Follow the evidence
 
 - [Final protocol and readback conclusions](docs/FINAL-ANALYSIS.md)
@@ -254,10 +303,14 @@ Omarchy setup. REA disassembly, exported UI definitions, USB captures and user
 observations supplied the pieces for a native controller. The evidence records
 explain which pieces held up and which controls were removed.
 
-`src/main.rs` owns HID, locking, persistence and diagnostics. `SignalService.qml`
-owns desktop events and arbitration; `BarWidget.qml` and `Panel.qml` provide the
-native UI. `manifest.json` registers the service and bar widget at the repo
-root. Original vendor binaries remain local, outside version control.
+The plugin is Rust and Quickshell only. `src/` holds the controller as a
+library plus the `lecoo-gk301` binary: `protocol` and `transport` own the
+wire format, `device` owns discovery and writes, `state` and `blackbox` own
+persistence, `lock` serializes every writer, and `udev` owns the single rule.
+`SignalService.qml` owns desktop events and arbitration; `BarWidget.qml` and
+`Panel.qml` provide the native UI. `manifest.json` registers the service and
+bar widget at the repo root. Original vendor binaries remain local, outside
+version control.
 
 ## License
 

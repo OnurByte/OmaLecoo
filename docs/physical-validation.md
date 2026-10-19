@@ -40,15 +40,15 @@ New XML finding: dlg_main.xml lines 15–124 are the Keyboard page; Panel LED
 lives there. Side LED appears at line 126 inside the Mouse page (line 125)
 behind visible=0. That strongly suggests shared application code that does
 not represent GK301 side-LED support; it is not a claim of firmware absence.
-The side LED UI was removed; main effects were kept. UI profile-load,
-preset and restore use --panel-only, so no side packet leaks out of those
-paths. Legacy research CLI and references are preserved.
+The side LED UI was removed; main effects were kept. The side writer was
+removed from the tool entirely, so no side packet can leave the preset,
+restore or effect paths. Legacy research CLI and references are preserved.
 
 Macro investigation: worker 0x420580 calls Windows keybd_event at 0x420621;
 macros execute on the host. Recovering an on-device macro programming
 protocol is not established, so no on-device macro feature was added.
 
-scripts/probe-windows-startup.py defaults to display-only mode; with
---send it replays the earlier physical experiment on one open connection.
-Because the last packet's byte4 0D and the delay changed within the same
-experiment, their individual effects remain unresolved.
+`lecoo-gk301 probe-startup` defaults to display-only mode; with --send it
+replays the earlier physical experiment on one open connection. Because the
+last packet's byte4 0D and the delay changed within the same experiment,
+their individual effects remain unresolved.

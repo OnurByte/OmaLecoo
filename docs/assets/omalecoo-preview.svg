@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0c11"/>
+      <stop offset="0.55" stop-color="#0e111a"/>
+      <stop offset="1" stop-color="#141826"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0.22" cy="0.78" r="0.55">
+      <stop offset="0" stop-color="#ff2d78" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff2d78" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0.5" cy="0.82" r="0.5">
+      <stop offset="0" stop-color="#7b5cff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#7b5cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="0.8" cy="0.76" r="0.55">
+      <stop offset="0" stop-color="#00e0c6" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#00e0c6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rgb" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff2d78"/>
+      <stop offset="0.25" stop-color="#ff7a1a"/>
+      <stop offset="0.5" stop-color="#ffd21a"/>
+      <stop offset="0.75" stop-color="#3ce07a"/>
+      <stop offset="1" stop-color="#00e0c6"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2030"/>
+      <stop offset="1" stop-color="#0d1017"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="soft2" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#glowA)"/>
+  <rect width="1600" height="900" fill="url(#glowB)"/>
+  <rect width="1600" height="900" fill="url(#glowC)"/>
+
+  <!-- keyboard -->
+  <g transform="translate(800,628) scale(0.88)">
+    <ellipse cx="0" cy="40" rx="600" ry="120" fill="#0b0e15" opacity="0.85"/>
+    <g filter="url(#soft)" opacity="0.75">
+      <rect x="-560" y="-150" width="1120" height="368" rx="34" fill="url(#rgb)"/>
+    </g>
+    <g filter="url(#soft2)" opacity="0.9">
+      <rect x="-548" y="-142" width="1096" height="352" rx="28" fill="none" stroke="url(#rgb)" stroke-width="6"/>
+    </g>
+    <rect x="-560" y="-150" width="1120" height="368" rx="34" fill="#0e1119" stroke="#262c3c" stroke-width="3"/>
+
+    <!-- key rows -->
+    <g fill="url(#key)" stroke="#313a50" stroke-width="2">
+      <!-- function row -->
+      <rect x="-520" y="-124" width="72" height="46" rx="10"/>
+      <rect x="-436" y="-124" width="72" height="46" rx="10"/>
+      <rect x="-352" y="-124" width="72" height="46" rx="10"/>
+      <rect x="-268" y="-124" width="72" height="46" rx="10"/>
+      <rect x="196" y="-124" width="72" height="46" rx="10"/>
+      <rect x="280" y="-124" width="72" height="46" rx="10"/>
+      <rect x="364" y="-124" width="72" height="46" rx="10"/>
+      <rect x="448" y="-124" width="72" height="46" rx="10"/>
+      <!-- number row -->
+      <rect x="-520" y="-66" width="78" height="60" rx="10"/>
+      <rect x="-432" y="-66" width="78" height="60" rx="10"/>
+      <rect x="-344" y="-66" width="78" height="60" rx="10"/>
+      <rect x="-256" y="-66" width="78" height="60" rx="10"/>
+      <rect x="-168" y="-66" width="78" height="60" rx="10"/>
+      <rect x="-80" y="-66" width="78" height="60" rx="10"/>
+      <rect x="8" y="-66" width="78" height="60" rx="10"/>
+      <rect x="96" y="-66" width="78" height="60" rx="10"/>
+      <rect x="184" y="-66" width="78" height="60" rx="10"/>
+      <rect x="272" y="-66" width="78" height="60" rx="10"/>
+      <rect x="360" y="-66" width="78" height="60" rx="10"/>
+      <rect x="448" y="-66" width="72" height="60" rx="10"/>
+      <!-- qwerty row -->
+      <rect x="-520" y="4" width="100" height="60" rx="10"/>
+      <rect x="-410" y="4" width="78" height="60" rx="10"/>
+      <rect x="-322" y="4" width="78" height="60" rx="10"/>
+      <rect x="-234" y="4" width="78" height="60" rx="10"/>
+      <rect x="-146" y="4" width="78" height="60" rx="10"/>
+      <rect x="-58" y="4" width="78" height="60" rx="10"/>
+      <rect x="30" y="4" width="78" height="60" rx="10"/>
+      <rect x="118" y="4" width="78" height="60" rx="10"/>
+      <rect x="206" y="4" width="78" height="60" rx="10"/>
+      <rect x="294" y="4" width="78" height="60" rx="10"/>
+      <rect x="382" y="4" width="78" height="60" rx="10"/>
+      <!-- asdf row -->
+      <rect x="-520" y="74" width="126" height="60" rx="10"/>
+      <rect x="-384" y="74" width="78" height="60" rx="10"/>
+      <rect x="-296" y="74" width="78" height="60" rx="10"/>
+      <rect x="-208" y="74" width="78" height="60" rx="10"/>
+      <rect x="-120" y="74" width="78" height="60" rx="10"/>
+      <rect x="-32" y="74" width="78" height="60" rx="10"/>
+      <rect x="56" y="74" width="78" height="60" rx="10"/>
+      <rect x="144" y="74" width="78" height="60" rx="10"/>
+      <rect x="232" y="74" width="78" height="60" rx="10"/>
+      <rect x="320" y="74" width="78" height="60" rx="10"/>
+      <rect x="408" y="74" width="112" height="60" rx="10"/>
+      <!-- bottom row -->
+      <rect x="-520" y="144" width="150" height="60" rx="10"/>
+      <rect x="-360" y="144" width="96" height="60" rx="10"/>
+      <rect x="-254" y="144" width="430" height="60" rx="10"/>
+      <rect x="186" y="144" width="96" height="60" rx="10"/>
+      <rect x="292" y="144" width="96" height="60" rx="10"/>
+      <rect x="398" y="144" width="122" height="60" rx="10"/>
+    </g>
+
+    <!-- RGB-lit keycaps -->
+    <g opacity="0.95">
+      <rect x="-520" y="-66" width="78" height="60" rx="10" fill="#ff2d78" opacity="0.55"/>
+      <rect x="-432" y="-66" width="78" height="60" rx="10" fill="#ff5c47" opacity="0.5"/>
+      <rect x="-344" y="-66" width="78" height="60" rx="10" fill="#ff8a1a" opacity="0.5"/>
+      <rect x="-256" y="-66" width="78" height="60" rx="10" fill="#ffb31a" opacity="0.5"/>
+      <rect x="-168" y="-66" width="78" height="60" rx="10" fill="#ffd21a" opacity="0.5"/>
+      <rect x="-80" y="-66" width="78" height="60" rx="10" fill="#f2e13a" opacity="0.45"/>
+      <rect x="8" y="-66" width="78" height="60" rx="10" fill="#d9ee4a" opacity="0.45"/>
+      <rect x="96" y="-66" width="78" height="60" rx="10" fill="#a8ec4c" opacity="0.45"/>
+      <rect x="184" y="-66" width="78" height="60" rx="10" fill="#6fe85a" opacity="0.5"/>
+      <rect x="272" y="-66" width="78" height="60" rx="10" fill="#3ce07a" opacity="0.5"/>
+      <rect x="360" y="-66" width="78" height="60" rx="10" fill="#22dfa0" opacity="0.5"/>
+      <rect x="448" y="-66" width="72" height="60" rx="10" fill="#00e0c6" opacity="0.5"/>
+      <rect x="-520" y="4" width="100" height="60" rx="10" fill="#ff3d6e" opacity="0.45"/>
+      <rect x="-410" y="4" width="78" height="60" rx="10" fill="#ff6b3c" opacity="0.45"/>
+      <rect x="-322" y="4" width="78" height="60" rx="10" fill="#ff9a22" opacity="0.45"/>
+      <rect x="-234" y="4" width="78" height="60" rx="10" fill="#ffc22a" opacity="0.45"/>
+      <rect x="-146" y="4" width="78" height="60" rx="10" fill="#ffe14a" opacity="0.4"/>
+      <rect x="-58" y="4" width="78" height="60" rx="10" fill="#c9ec5c" opacity="0.4"/>
+      <rect x="30" y="4" width="78" height="60" rx="10" fill="#94ec6a" opacity="0.45"/>
+      <rect x="118" y="4" width="78" height="60" rx="10" fill="#5fe779" opacity="0.45"/>
+      <rect x="206" y="4" width="78" height="60" rx="10" fill="#2fe399" opacity="0.45"/>
+      <rect x="294" y="4" width="78" height="60" rx="10" fill="#12dfba" opacity="0.45"/>
+      <rect x="382" y="4" width="78" height="60" rx="10" fill="#00d6c9" opacity="0.45"/>
+      <rect x="-520" y="74" width="126" height="60" rx="10" fill="#ff2d78" opacity="0.4"/>
+      <rect x="-384" y="74" width="78" height="60" rx="10" fill="#ff7a3a" opacity="0.4"/>
+      <rect x="-296" y="74" width="78" height="60" rx="10" fill="#ffa522" opacity="0.4"/>
+      <rect x="-208" y="74" width="78" height="60" rx="10" fill="#ffd02a" opacity="0.4"/>
+      <rect x="-120" y="74" width="78" height="60" rx="10" fill="#e8ea55" opacity="0.38"/>
+      <rect x="-32" y="74" width="78" height="60" rx="10" fill="#b0ec74" opacity="0.38"/>
+      <rect x="56" y="74" width="78" height="60" rx="10" fill="#6bea86" opacity="0.38"/>
+      <rect x="144" y="74" width="78" height="60" rx="10" fill="#35e3a8" opacity="0.4"/>
+      <rect x="232" y="74" width="78" height="60" rx="10" fill="#14dfc4" opacity="0.4"/>
+      <rect x="320" y="74" width="78" height="60" rx="10" fill="#00d0d6" opacity="0.4"/>
+      <rect x="408" y="74" width="112" height="60" rx="10" fill="#00b8dd" opacity="0.4"/>
+      <rect x="-520" y="144" width="150" height="60" rx="10" fill="#e02a6a" opacity="0.35"/>
+      <rect x="-360" y="144" width="96" height="60" rx="10" fill="#ff6a2f" opacity="0.35"/>
+      <rect x="-254" y="144" width="430" height="60" rx="10" fill="#ffae22" opacity="0.32"/>
+      <rect x="186" y="144" width="96" height="60" rx="10" fill="#3ce07a" opacity="0.35"/>
+      <rect x="292" y="144" width="96" height="60" rx="10" fill="#00dca8" opacity="0.35"/>
+      <rect x="398" y="144" width="122" height="60" rx="10" fill="#00c6d6" opacity="0.35"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <g font-family="Inter, 'Noto Sans', 'Liberation Sans', sans-serif">
+    <text x="800" y="215" text-anchor="middle" font-size="112" font-weight="700" letter-spacing="-2" fill="#f4f6fb">OmaLecoo</text>
+    <text x="800" y="278" text-anchor="middle" font-size="34" fill="#9aa4bf">Native RGB control for the Lecoo GK301 — inside Omarchy.</text>
+    <rect x="640" y="308" width="320" height="3" rx="1.5" fill="url(#rgb)"/>
+  </g>
+
+  <!-- chips -->
+  <g font-family="Inter, 'Noto Sans', 'Liberation Sans', sans-serif" font-size="25" fill="#d7dced">
+    <g>
+      <rect x="330" y="352" width="250" height="58" rx="29" fill="#151a26" stroke="#2a3143" stroke-width="2"/>
+      <text x="455" y="390" text-anchor="middle">20 lighting effects</text>
+    </g>
+    <g>
+      <rect x="600" y="352" width="290" height="58" rx="29" fill="#151a26" stroke="#2a3143" stroke-width="2"/>
+      <text x="745" y="390" text-anchor="middle">Brightness 0–13</text>
+    </g>
+    <g>
+      <rect x="910" y="352" width="260" height="58" rx="29" fill="#151a26" stroke="#2a3143" stroke-width="2"/>
+      <text x="1040" y="390" text-anchor="middle">Rust + Quickshell</text>
+    </g>
+    <g>
+      <rect x="1190" y="352" width="230" height="58" rx="29" fill="#151a26" stroke="#2a3143" stroke-width="2"/>
+      <text x="1305" y="390" text-anchor="middle">No daemon</text>
+    </g>
+  </g>
+
+  <g font-family="Inter, 'Noto Sans', 'Liberation Sans', sans-serif" font-size="24" fill="#6f7a96">
+    <text x="800" y="855" text-anchor="middle">SEMICO 1a2c:9df4 · firmware 1.16 · reverse-engineered HID protocol · MIT</text>
+  </g>
+</svg>
