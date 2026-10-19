@@ -4,6 +4,73 @@ Version `1.5.0` identifies the Signal Engine development line in the Cargo
 package and plugin manifest. This document records implementation checks and
 historical release notes; it does not announce publication of v1.5.0.
 
+## Live session — 20 October 2026
+
+The plugin was installed into a live Omarchy session (`~/.config/omarchy/plugins/borat.lecoo-rgb`,
+controller built from this branch into `~/.local/bin/lecoo-gk301`) and
+exercised against the connected GK301.
+
+Observed and confirmed:
+
+- The panel opens from the bar, reads the device, and shows firmware
+  **1.16**, the 20-effect grid, brightness, speed, the Gaming M1/M2 selector,
+  the presets and the auto-cycle control.
+- The service runs inside the same Quickshell process and checks presence
+  every ten seconds with `dev --json` — no HID report is sent by that check.
+- Rule arbitration works on the real keyboard. The Blackbox recorded
+  `origin: "signal"` writes in both directions: the default rule sent
+  `07 FF FF 0D 05 02 00 00` (the saved manual record), and focusing a
+  fullscreen window sent `07 FF FF 01 05 02 00 00` — the Game preset.
+- Manual panel actions are tagged `origin: "panel"`, and the service is
+  tagged `origin: "signal"`, so the Blackbox distinguishes the two writers.
+- A signal-origin write did not replace the saved manual restore point: the
+  service applied effect 1 while `state.json` kept the user's effect.
+- The 30-minute manual pause is observable: after a manual panel action the
+  service stopped writing, and the next rule transition only happened after
+  the pause state was cleared by a fresh service start.
+
+Not observed, so still pending:
+
+- The **idle rule** needs five idle minutes; it was not reached in this
+  session.
+- The **reconnect recovery** needs the keyboard to be unplugged; it was not
+  exercised.
+- The **expiry of the 30-minute manual pause** was not waited out.
+- The **setup and removal flows** (Cargo availability, the polkit
+  authorization, the plugin removal) were not run in this session. The udev
+  rule was already installed, and the device was writable.
+- The **lock-screen rule** remains deferred by design: no stable public
+  Omarchy lock-state signal is assumed.
+
+The session was left with automation off, the same as before it started, and
+the saved manual lighting state reapplied to the device.
+
+`preview.png` at the repository root is a screenshot of that live session: the
+Lighting page with the keyboard connected, the firmware read and the effect
+grid. It is the image the marketplace uses. The project banner in the README
+(`docs/assets/omalecoo-banner.png`, source `docs/assets/omalecoo-banner.svg`)
+is a designed image, not a screenshot.
+
+## Windows app parity — 20 October 2026
+
+The original Windows tool was inventoried from its shipped resource files
+(`dlg_main.xml`, `config.xml`, `macro.xml`, `ledeffect.xml`,
+`sidemodel.xml`, `color.xml`, `positions.xml`, `record.xml`) against the
+existing disassembly records, and compared with the live controller. The
+result is in [windows-app-parity.md](windows-app-parity.md).
+
+Three differences remain. The macro editor and the function/media key
+programming are not lighting controls and have no portable device protocol
+behind them. The third one, the Windows app's *Settings → Restore*, was
+closed: `lecoo-gk301 restore --factory` now applies the same default record
+the Windows tool starts with (Steady, brightness 5, speed 2, first option)
+and makes it the new manual state. The panel exposes it as *Restore factory
+lighting defaults*.
+
+The Windows app's *Direction* control is not a difference in practice: its
+own normal writer overwrites the direction byte with the selection byte and
+never transmits it, so the device never receives a direction value.
+
 ## Rust-only cleanup — 20 October 2026
 
 The plugin is now Rust and Quickshell only. No standalone C, JavaScript/Node
@@ -28,9 +95,11 @@ dispatches.
 
 The README gained a marketplace-facing landing page, an explicit
 **What this plugin touches** table (one privileged file, one user binary, one
-state directory) and a root `preview.png` — the banner the marketplace uses
+state directory) and a root `preview.png` — the image the marketplace uses
 when it cannot find a supported preview. The banner is a project image, not a
-screenshot of the panel; `docs/assets/omalecoo-preview.svg` is its source.
+screenshot of the panel; `docs/assets/omalecoo-banner.svg` is its source. The
+root preview was later replaced with a real screenshot of a live session; see
+the live-session section above.
 
 Checks for this cleanup: `cargo fmt --check`,
 `cargo check --all-targets --locked --offline`, `cargo build --release
@@ -154,9 +223,10 @@ commands.
 
 No test suite was added or run for this v1.5 implementation. No live QML
 session, new physical GK301 validation, source installation, polkit action,
-uninstall or system mutation was performed during these tasks. Fullscreen,
-idle, reconnect, runtime launch failures and setup/removal remain pending
-live validation. Historical test results below do not validate these features.
+uninstall or system mutation was performed during the implementation tasks.
+The 20 October 2026 live session covered the panel, the service and the rule
+arbitration; see the live-session section above for what it did and did not
+cover. Historical test results below do not validate these features.
 
 ## Historical — 1.4.1 (marketplace layout)
 

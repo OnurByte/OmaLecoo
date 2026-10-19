@@ -613,6 +613,11 @@ Panel {
                 onClicked: root.enqueue(["restore"])
               }
               PanelActionButton {
+                iconText: "󰓜"
+                tooltipText: "Restore factory lighting defaults"
+                onClicked: root.enqueue(["restore", "--factory"])
+              }
+              PanelActionButton {
                 iconText: "󰐥"
                 tooltipText: "Turn lighting off"
                 onClicked: root.applyPreset("off")

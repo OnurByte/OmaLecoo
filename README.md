@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="preview.png" alt="OmaLecoo — native Lecoo GK301 RGB control for Omarchy" width="900">
+<img src="docs/assets/omalecoo-banner.png" alt="OmaLecoo — native Lecoo GK301 RGB control for Omarchy" width="900">
 
 # OmaLecoo
 
@@ -46,9 +46,10 @@ keyboard. The write-up lives in [`docs/`](docs/FINAL-ANALYSIS.md).
 The lighting protocol comes from reverse engineering the official Windows
 controller, matching USB control captures, and asking the user what the
 physical LEDs actually did. The v1.5 service builds on those existing
-commands; its runtime and reconnect behavior still need live validation. See
-the [verification record](docs/verification.md) for the checks performed so
-far.
+commands. Its fullscreen and restore rules were confirmed on a live Omarchy
+session on 20 October 2026; the idle rule and reconnect recovery still need
+live validation. See the [verification record](docs/verification.md) for the
+checks performed so far.
 
 ## Setup
 
@@ -176,11 +177,28 @@ schedule the existing packets; it does not add new keyboard capabilities.
 | Brightness 0–13 | Windows UI clamps to 5; its stored record carries 13. The user confirmed a visible difference between 5 and 13. [Experiment](docs/captures/extended-brightness-experiment.md). |
 | Speed 0–2; Gaming M1/M2 | Recovered main-panel mapping: speed for effects 2–19, game-key selection for effect 1. [Analysis](docs/FINAL-ANALYSIS.md). |
 | Presets, rotation, restore | Software compositions of the existing main-panel command. No extra packet family or on-device preset storage is claimed. |
+| Factory defaults | `restore --factory` applies the same default record the Windows tool starts with, and makes it the new manual state. |
 | Signal Engine, Blackbox, Ghost Mode | Implemented software features; static/build checks and live-validation limits are listed in [verification](docs/verification.md). |
 | Firmware response | Validated F1 reply contains firmware data. The tested GET path does not report current lighting. [Readback experiment](docs/FINAL-ANALYSIS.md#new-readback-experiment). |
 | Side RGB | Excluded: the recovered writer belongs to a hidden Mouse page and caused no visible change on this keyboard. [Failure analysis](docs/side-failure-analysis.md). |
 | Custom colors / per-key RGB | No arbitrary RGB triplet or per-key sender established. [Color investigation](docs/custom-color-investigation.md). |
 | On-device macros | Not implemented: the recovered macro worker plays keys on the Windows host. [Analysis](docs/FINAL-ANALYSIS.md#excluded-capabilities). |
+
+### Compared with the original Windows tool
+
+The full inventory is in [Windows app ↔ OmaLecoo feature parity](docs/windows-app-parity.md).
+Three differences remain, and only one of them is a lighting control:
+
+- **The macro editor** is not implemented. The recovered macro worker plays
+  keys on the Windows host, so there is no on-device macro protocol to port.
+- **Function/media key programming** is not implemented. That is the
+  compositor's job on Linux, and the GK301's media keys are standard HID.
+- **Settings → Restore** now has an equivalent: `restore --factory`.
+
+OmaLecoo also goes beyond the Windows tool in brightness (0–13 versus a UI
+clamp of 5), in per-effect control (one uniform record instead of per-effect
+pages that hide fields), and in everything the Windows app never had:
+desktop-aware rules, a local command log, and an Omarchy-native panel.
 
 ### Eight bytes to the keyboard
 
@@ -212,10 +230,14 @@ its reason. Blackbox provides the command history behind the controls.
 Right-click the bar icon for the next effect; scroll for brightness. Panel
 shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
 
-The banner at the top of this page is a project image, not a screenshot of the
-panel. To capture the real interface, open one of those pages in your
-installed Omarchy session and use its screenshot action. Hardware appearance
-still requires looking at the connected keyboard.
+<img src="docs/assets/panel-lighting.png" alt="The OmaLecoo Lighting page in Omarchy" width="420">
+
+That is the real panel, captured from a live Omarchy session on 20 October
+2026 with the keyboard connected. The header shows the device, the selected
+effect and the brightness; the five buttons are the panel pages. The banner
+at the top of this page is a project image, not a screenshot.
+
+Hardware appearance still requires looking at the connected keyboard.
 
 ## CLI
 
@@ -243,7 +265,8 @@ lecoo-gk301 brightness 8
 lecoo-gk301 next
 lecoo-gk301 prev
 lecoo-gk301 preset night            # silent | game | night | party | off | random
-lecoo-gk301 restore
+lecoo-gk301 restore                 # reapply the saved manual settings
+lecoo-gk301 restore --factory       # apply the Windows tool's default lighting record
 
 # Diagnostics that access vendor HID
 lecoo-gk301 doctor
@@ -296,6 +319,7 @@ Remove those with the method you installed them with.
 - [USB captures and live analysis](docs/captures/live-analysis.md) · [final readback capture](docs/captures/final-readback-control.pcapng) · [direct ioctl observations](docs/captures/final-readback-probe.json)
 - [REA findings](docs/rea-findings.md) · [HID descriptors](docs/hid-descriptors.json)
 - [Why arbitrary color is unproven](docs/custom-color-investigation.md)
+- [Windows app ↔ OmaLecoo feature parity](docs/windows-app-parity.md)
 - [Development checks and historical release notes](docs/verification.md)
 
 The project began with a Windows-only GK301 utility that would not run in my

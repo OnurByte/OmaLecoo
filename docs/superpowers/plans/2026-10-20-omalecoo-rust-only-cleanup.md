@@ -86,11 +86,12 @@ manifest. No new dependency.
 
 **Files:**
 - Modify: `README.md`
-- Create: `preview.png`, `docs/assets/omalecoo-preview.svg`
+- Create: `preview.png`, `docs/assets/omalecoo-banner.png`, `docs/assets/omalecoo-banner.svg`
 - Modify: `docs/verification.md`, `docs/physical-validation.md`
 
-- [x] **Step 1:** Add a root `preview.png` (1600×900) so the marketplace stops
-  falling back to its generic preview.
+- [x] **Step 1:** Add a root `preview.png` so the marketplace stops
+  falling back to its generic preview. It was first a designed banner and was
+  later replaced with a real screenshot of a live session.
 - [x] **Step 2:** Add the landing page, the feature grid and an explicit
   **What this plugin touches** table covering the one privileged file, the
   controller path and the state directory.
@@ -110,4 +111,31 @@ No test suite was run for this cleanup. The QML service and panel were not
 started, no polkit, install or uninstall flow was exercised, and no HID
 report was sent to the keyboard. The runtime behaviour of the Signal Engine
 still needs live validation, as recorded in
+[docs/verification.md](../verification.md).
+
+---
+
+### Task 4: Live session and Windows app parity
+
+**Files:**
+- Create: `docs/windows-app-parity.md`
+- Modify: `src/commands.rs`, `src/cli.rs`, `Panel.qml`, `README.md`,
+  `docs/verification.md`, `preview.png`
+
+- [x] **Step 1:** Install the plugin into a live Omarchy session and open the
+  panel against the connected keyboard.
+- [x] **Step 2:** Record what the session proves: the panel reads the device,
+  the service arbitrates rules, and the Blackbox separates the `panel` and
+  `signal` origins.
+- [x] **Step 3:** Capture the panel as the root `preview.png` for the
+  marketplace.
+- [x] **Step 4:** Inventory the original Windows tool from its shipped
+  resource files and compare it with the live controller.
+- [x] **Step 5:** Close the one difference that belongs to a lighting
+  controller: `restore --factory`, plus the matching panel action.
+- [x] **Step 6:** Record the remaining differences and why they are out of
+  scope on Linux.
+
+The idle rule, the reconnect recovery, the pause expiry and the setup and
+removal flows still need live validation; they are listed as pending in
 [docs/verification.md](../verification.md).

@@ -67,7 +67,7 @@ Usage:\n\
   lecoo-gk301 capabilities [--json]        show verified capabilities\n\
   lecoo-gk301 doctor                       connection and debug information\n\
   lecoo-gk301 response [--json]            validated firmware return path\n\
-  lecoo-gk301 restore                      apply saved manual settings\n\
+  lecoo-gk301 restore [--factory]           apply saved manual settings (or the factory defaults)\n\
   lecoo-gk301 dev [--json]                 show device presence and writability\n\
   lecoo-gk301 status [--json]              show saved manual state (not lighting readback)\n\
   lecoo-gk301 rules [--json]               show automation settings\n\

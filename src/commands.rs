@@ -75,10 +75,31 @@ pub fn dispatch(args: &[String]) -> Result<(), String> {
             println!("Firmware response received. This query does not confirm that lighting settings were applied; the readback does not carry lighting state.");
         }
         "restore" => {
-            let st = State::load();
+            // `--factory` applies the same default record the original Windows
+            // tool starts with: Steady, brightness 5, speed 2, first option.
+            let factory = has_flag(args, "--factory");
+            let st = if factory {
+                State::default()
+            } else {
+                State::load()
+            };
             let dev = Device::open_detected(device)?;
             send_panel(&dev, &st, origin)?;
-            println!("Last saved lighting settings applied");
+            if factory {
+                // A manual factory reset becomes the new restore point; an
+                // automatic write must not replace the user's manual state.
+                if origin != "signal" {
+                    st.save()?;
+                }
+                println!(
+                    "Factory defaults applied: {} brightness {}/13 speed {}/2",
+                    st.name(),
+                    st.brightness,
+                    st.speed
+                );
+            } else {
+                println!("Last saved lighting settings applied");
+            }
         }
         "response" => {
             let dev = Device::open_detected(device)?;
