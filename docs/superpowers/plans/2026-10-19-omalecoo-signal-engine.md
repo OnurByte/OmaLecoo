@@ -93,4 +93,3 @@
 - [ ] **Step 3: Explain the setup flow, Cargo prerequisite, polkit udev authorization, in-panel removal choices, preserved state, and privacy boundary.**
 - [ ] **Step 4: Link protocol and hardware claims directly to the existing evidence documents** and document a real preview/screenshot path without inventing product screenshots.
 - [ ] **Step 5: Run `git diff --check`, inspect all changed docs against the CLI and manifest, and review the final diff.**
-
