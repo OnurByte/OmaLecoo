@@ -89,6 +89,12 @@ Panel {
     else if (!presenceProc.running) { presenceProc.output = ""; presenceProc.running = true }
   }
   function refreshBlackbox() { if (!blackboxProc.running && !setupBusy) blackboxProc.running = true }
+  function refreshCargo() {
+    if (cargoProbe.running) return
+    root.cargoAvailable = false
+    cargoProbe.running = true
+  }
+  onPageChanged: if (page === "setup") refreshCargo()
 
   function parseStatus(raw, generation) {
     if (root.busy || root.queue.length > 0 || (generation !== undefined && generation !== root.stateGeneration)) return
@@ -258,10 +264,11 @@ Panel {
     root.refreshCatalog()
     root.refresh()
     root.refreshInfo()
-    cargoProbe.running = true
+    root.refreshCargo()
   }
 
   function open() {
+    if (root.page === "setup") root.refreshCargo()
     root.refresh()
     root.refreshInfo()
     root.refreshBlackbox()
@@ -974,6 +981,7 @@ Panel {
             PanelSectionHeader { text: "SETUP"; foreground: Color.foreground }
             Note { width: parent.width; text: "1. Install the controller from source into ~/.local. Cargo and Rust are required. The source is https://github.com/OnurByte/OmaLecoo." }
             Note { width: parent.width; visible: !root.cargoAvailable; text: "Cargo was not found. Install the prerequisite: omarchy pkg add rust" }
+            Button { text: "Refresh Cargo availability"; enabled: !root.setupBusy; onClicked: root.refreshCargo() }
             Button {
               text: "Install controller from source"
               enabled: root.cargoAvailable && !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)

@@ -33,20 +33,30 @@ Item {
   signal commandFinished()
 
   function reloadState() {
-    if (!rulesProc.running) { rulesProc.output = ""; rulesProc.running = true }
+    if (!rulesProc.running && rulesProc.handled) {
+      rulesProc.output = ""
+      rulesProc.error = ""
+      rulesProc.handled = false
+      rulesProc.running = true
+    }
     checkPresence()
     schedule()
   }
 
   function checkPresence() {
-    if (!presenceProc.running) { presenceProc.output = ""; presenceProc.running = true }
+    if (!presenceProc.running && presenceProc.handled) {
+      presenceProc.output = ""
+      presenceProc.handled = false
+      presenceProc.running = true
+    }
   }
 
   function setRules(automation, recovery) {
-    if (rulesWrite.running || suspended) return
+    if (rulesWrite.running || !rulesWrite.handled || suspended) return
     rulesWrite.command = [binary, "rules", "set", "--automation", automation ? "on" : "off",
                           "--restore-on-reconnect", recovery ? "on" : "off"]
     rulesWrite.error = ""
+    rulesWrite.handled = false
     rulesWrite.running = true
   }
 
@@ -150,63 +160,115 @@ Item {
   Process {
     id: rulesProc
     property string output: ""
+    property string error: ""
+    property bool handled: true
     command: [root.binary, "rules", "--json"]
     stdout: StdioCollector { onStreamFinished: rulesProc.output = String(text || "") }
+    stderr: StdioCollector { onStreamFinished: rulesProc.error = String(text || "").trim() }
     onExited: function(code) {
-      if (code === 0) {
-        try {
-          var data = JSON.parse(output)
-          root.automationEnabled = data.automation_enabled === true
-          root.restoreOnReconnect = data.restore_on_reconnect === true
-          root.rulesLoaded = true
-        } catch (e) { root.lastOutcome = "Could not read automation settings" }
-      } else { root.lastOutcome = "Controller unavailable. Open Setup to install it." }
-      root.schedule()
+      Qt.callLater(function() { root.finishRulesRead(code) })
     }
+    onRunningChanged: if (!running && !handled) rulesReadFailureGuard.restart()
+  }
+  function finishRulesRead(code) {
+    if (rulesProc.handled) return
+    rulesProc.handled = true
+    rulesReadFailureGuard.stop()
+    root.rulesLoaded = false
+    try {
+      if (code !== 0) throw new Error("unavailable")
+      var data = JSON.parse(rulesProc.output)
+      root.automationEnabled = data.automation_enabled === true
+      root.restoreOnReconnect = data.restore_on_reconnect === true
+      root.rulesLoaded = true
+    } catch (e) {
+      root.automationEnabled = false
+      root.restoreOnReconnect = false
+      root.lastOutcome = code === 0 ? "Could not read automation settings"
+        : rulesProc.error || "Controller unavailable. Open Setup to install or verify it."
+    }
+    root.schedule()
+  }
+  Timer {
+    id: rulesReadFailureGuard
+    interval: 100
+    onTriggered: if (!rulesProc.running && !rulesProc.handled) root.finishRulesRead(1)
   }
   Process {
     id: rulesWrite
     property string error: ""
+    property bool handled: true
     stderr: StdioCollector { onStreamFinished: rulesWrite.error = String(text || "").trim() }
     onExited: function(code) {
-      if (code !== 0) root.lastOutcome = error || "Could not save automation settings"
-      root.appliedRule = ""
-      root.reloadState()
+      Qt.callLater(function() { root.finishRulesWrite(code) })
     }
+    onRunningChanged: if (!running && !handled) rulesWriteFailureGuard.restart()
+  }
+  function finishRulesWrite(code) {
+    if (rulesWrite.handled) return
+    rulesWrite.handled = true
+    rulesWriteFailureGuard.stop()
+    root.appliedRule = ""
+    if (code !== 0) {
+      root.rulesLoaded = false
+      root.automationEnabled = false
+      root.restoreOnReconnect = false
+      root.lastOutcome = rulesWrite.error || "Could not start the controller to save automation settings. Open Setup to install or verify it."
+      root.checkPresence()
+      root.schedule()
+    } else root.reloadState()
+  }
+  Timer {
+    id: rulesWriteFailureGuard
+    interval: 100
+    onTriggered: if (!rulesWrite.running && !rulesWrite.handled) root.finishRulesWrite(1)
   }
   Process {
     id: presenceProc
     property string output: ""
+    property bool handled: true
     command: [root.binary, "dev", "--json"]
     stdout: StdioCollector { onStreamFinished: presenceProc.output = String(text || "") }
     onExited: function(code) {
-      var wasKnown = root.presenceKnown
-      var wasConnected = root.connected
-      var wasWritable = root.writable
-      try {
-        if (code !== 0) throw new Error("unavailable")
-        var data = JSON.parse(output)
-        root.connected = data.connected === true
-        root.writable = data.writable === true
-        root.connectionMessage = !root.connected ? "Ghost Mode · keyboard disconnected. Showing cached settings."
-          : !root.writable ? "Keyboard connected · permission denied. Authorize device access in Setup."
-          : "Keyboard connected · settings are cached commands, not lighting readback."
-      } catch (e) {
-        root.connected = false
-        root.writable = false
-        root.connectionMessage = "Controller unavailable · install or verify it in Setup. Showing cached settings."
-      }
-      root.presenceKnown = true
-      if (!root.connected) root.reconnectPending = false
-      if (wasKnown && !wasConnected && root.connected) {
-        root.reconnectPending = root.restoreOnReconnect
-        // Recovery is opt-in. Do not turn a presence transition into a
-        // second automation write (or an implicit restore when disabled).
-        root.updateRule()
-        root.appliedRule = root.activeRule
-      } else if (wasConnected && root.connected && !wasWritable && root.writable) root.appliedRule = ""
-      root.schedule()
+      Qt.callLater(function() { root.finishPresence(code) })
     }
+    onRunningChanged: if (!running && !handled) presenceFailureGuard.restart()
+  }
+  function finishPresence(code) {
+    if (presenceProc.handled) return
+    presenceProc.handled = true
+    presenceFailureGuard.stop()
+    var wasKnown = root.presenceKnown
+    var wasConnected = root.connected
+    var wasWritable = root.writable
+    try {
+      if (code !== 0) throw new Error("unavailable")
+      var data = JSON.parse(presenceProc.output)
+      root.connected = data.connected === true
+      root.writable = data.writable === true
+      root.connectionMessage = !root.connected ? "Ghost Mode · keyboard disconnected. Showing cached settings."
+        : !root.writable ? "Keyboard connected · permission denied. Authorize device access in Setup."
+        : "Keyboard connected · settings are cached commands, not lighting readback."
+    } catch (e) {
+      root.connected = false
+      root.writable = false
+      root.connectionMessage = "Controller unavailable · install or verify it in Setup. Showing cached settings."
+    }
+    root.presenceKnown = true
+    if (!root.connected) root.reconnectPending = false
+    if (wasKnown && !wasConnected && root.connected) {
+      root.reconnectPending = root.restoreOnReconnect
+      // Recovery is opt-in. Do not turn a presence transition into a
+      // second automation write (or an implicit restore when disabled).
+      root.updateRule()
+      root.appliedRule = root.activeRule
+    } else if (wasConnected && root.connected && !wasWritable && root.writable) root.appliedRule = ""
+    root.schedule()
+  }
+  Timer {
+    id: presenceFailureGuard
+    interval: 100
+    onTriggered: if (!presenceProc.running && !presenceProc.handled) root.finishPresence(1)
   }
   Process {
     id: writer
