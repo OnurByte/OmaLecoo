@@ -30,6 +30,10 @@ the service, then the panel walks you through the two remaining steps.
 | --- | --- | --- |
 | Opt-in fullscreen and idle rules, with the active reason shown in the panel. | UTC time, command origin, report bytes and syscall outcome, stored locally. | Muted cached settings while disconnected, with optional one-time recovery on reconnect. |
 
+| Macros | Function keys |
+| --- | --- |
+| Timed lighting sequences you build in the panel and play on the keyboard. | The GK301's function and media keys, with the commands Hyprland runs for them. |
+
 No daemon. No second Quickshell process. No network calls. The panel and the
 CLI talk to the keyboard through one small Rust controller that serializes
 every write behind a single lock.
@@ -105,7 +109,7 @@ else is written, and no other plugin's configuration is modified.
 | --- | --- | --- |
 | `/etc/udev/rules.d/70-lecoo-gk301.rules` | Only in the polkit-authorized step | One udev rule granting your session access to the GK301 hidraw node. Exact-content checked: it is never overwritten with different content, and removal only deletes a file with the exact content it owns. |
 | `~/.local/bin/lecoo-gk301` | When you install the controller from source | The Rust controller. `cargo install --root "$HOME/.local"`, or any other path you choose. |
-| `~/.local/state/lecoo-gk301/` | While the plugin is used | `state.json` (your manual restore point), `rules.json` (automation settings), `blackbox.jsonl` (command history), `debug.log` and `command.lock`. |
+| `~/.local/state/lecoo-gk301/` | While the plugin is used | `state.json` (your manual restore point), `rules.json` (automation settings), `macros.json` and `keys.json` (your macros and key commands), `hypr-binds.lua` (the generated Hyprland fragment), `blackbox.jsonl` (command history), `debug.log` and `command.lock`. |
 
 - **Privileged action:** exactly one — the polkit step that writes the udev
   rule. It is invoked as `pkexec <controller> udev install` with a fixed
@@ -148,6 +152,50 @@ widget is attached; removing the last widget cancels pending recovery.
 Replacement bars can retain manual controls, but do not provide this service
 integration.
 
+## Macros: lighting sequences
+
+A macro is a named, timed sequence of lighting states. Build one in the
+**Macros** page: press **Add current lighting** to append the effect,
+brightness and speed that are on screen right now, set the delay before the
+step, and save it under a name. **Play** sends the whole sequence to the
+keyboard; **Remove** deletes it.
+
+The original Windows tool recorded key sequences and replayed them on the
+Windows host with `keybd_event`. On Linux the compositor owns keyboard input,
+so OmaLecoo's macros move the lights instead — the device-side sequence the
+hardware can actually perform. Every step is an ordinary panel command, so
+macros obey the same lock, pacing and Blackbox records as everything else.
+
+```bash
+lecoo-gk301 macro list --json
+lecoo-gk301 macro save --name boot --steps '[{"delay_ms":0,"effect":0,"brightness":8,"speed":2,"select":0}]'
+lecoo-gk301 macro play boot
+lecoo-gk301 macro export ~/macros.json
+lecoo-gk301 macro import ~/macros.json
+```
+
+## Function keys
+
+The **Keys** page lists the GK301's function and media keys with the names and
+codes the original Windows tool used in its `config.xml`. Each key gets the
+command Hyprland should run; an empty field leaves the key alone. **Write
+Hyprland fragment** writes the result to
+`~/.local/state/lecoo-gk301/hypr-binds.lua` and prints the line to add to
+your own Hyprland config:
+
+```lua
+dofile(os.getenv("HOME") .. "/.local/state/lecoo-gk301/hypr-binds.lua")
+```
+
+Omarchy already binds the volume and media keys, so including the fragment
+takes them over. Delete a line to keep Omarchy's own binding.
+
+```bash
+lecoo-gk301 keys list --json
+lecoo-gk301 keys set "Calculator" --command "omacalc"
+lecoo-gk301 keys export
+```
+
 ## See what was sent
 
 **HID Blackbox** records OmaLecoo's vendor-HID exchanges with UTC timestamps,
@@ -187,13 +235,15 @@ schedule the existing packets; it does not add new keyboard capabilities.
 ### Compared with the original Windows tool
 
 The full inventory is in [Windows app ↔ OmaLecoo feature parity](docs/windows-app-parity.md).
-Three differences remain, and only one of them is a lighting control:
+The three differences that were open are now handled:
 
-- **The macro editor** is not implemented. The recovered macro worker plays
-  keys on the Windows host, so there is no on-device macro protocol to port.
-- **Function/media key programming** is not implemented. That is the
-  compositor's job on Linux, and the GK301's media keys are standard HID.
-- **Settings → Restore** now has an equivalent: `restore --factory`.
+- **Settings → Restore** has an equivalent: `restore --factory`, also on the
+  panel.
+- **The macro editor** exists as lighting macros. The original recorded key
+  sequences and replayed them on the Windows host; on Linux the compositor
+  owns keyboard input, so the macros here are device-side lighting sequences.
+- **The function-key configuration** exists as the GK301 key map plus a
+  generated Hyprland fragment, which is how a Linux desktop programs keys.
 
 OmaLecoo also goes beyond the Windows tool in brightness (0–13 versus a UI
 clamp of 5), in per-effect control (one uniform record instead of per-effect
@@ -222,10 +272,11 @@ bounds the claim to that query path; it does not prove no other query exists.
 ## Preview it in Omarchy
 
 With this plugin checkout loaded in the built-in bar, left-click its keyboard
-icon. **Lighting → Automation → Blackbox → Setup → Uninstall** are the five
-panel pages. Open Lighting for the searchable effect grid, brightness, speed,
-Gaming M1/M2, presets and auto cycle; open Automation for the current rule and
-its reason. Blackbox provides the command history behind the controls.
+icon. **Lighting → Automation → Macros → Keys → Blackbox → Setup → Uninstall**
+are the seven panel pages. Open Lighting for the searchable effect grid,
+brightness, speed, Gaming M1/M2, presets and auto cycle; open Automation for
+the current rule and its reason; Macros builds lighting sequences; Keys maps
+the function keys; Blackbox provides the command history behind the controls.
 
 Right-click the bar icon for the next effect; scroll for brightness. Panel
 shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
@@ -234,7 +285,7 @@ shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
 
 That is the real panel, captured from a live Omarchy session on 20 October
 2026 with the keyboard connected. The header shows the device, the selected
-effect and the brightness; the five buttons are the panel pages. The banner
+effect and the brightness; the seven buttons are the panel pages. The banner
 at the top of this page is a project image, not a screenshot.
 
 Hardware appearance still requires looking at the connected keyboard.
@@ -267,6 +318,14 @@ lecoo-gk301 prev
 lecoo-gk301 preset night            # silent | game | night | party | off | random
 lecoo-gk301 restore                 # reapply the saved manual settings
 lecoo-gk301 restore --factory       # apply the Windows tool's default lighting record
+
+# Macros: timed lighting sequences
+lecoo-gk301 macro list --json
+lecoo-gk301 macro play <name>
+
+# Function keys: the GK301 key map and the Hyprland fragment
+lecoo-gk301 keys list --json
+lecoo-gk301 keys export
 
 # Diagnostics that access vendor HID
 lecoo-gk301 doctor
@@ -330,7 +389,8 @@ explain which pieces held up and which controls were removed.
 The plugin is Rust and Quickshell only. `src/` holds the controller as a
 library plus the `lecoo-gk301` binary: `protocol` and `transport` own the
 wire format, `device` owns discovery and writes, `state` and `blackbox` own
-persistence, `lock` serializes every writer, and `udev` owns the single rule.
+persistence, `macros` and `keys` own the macro and function-key models,
+`lock` serializes every writer, and `udev` owns the single rule.
 `SignalService.qml` owns desktop events and arbitration; `BarWidget.qml` and
 `Panel.qml` provide the native UI. `manifest.json` registers the service and
 bar widget at the repo root. Original vendor binaries remain local, outside

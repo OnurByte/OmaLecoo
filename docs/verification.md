@@ -4,6 +4,47 @@ Version `1.5.0` identifies the Signal Engine development line in the Cargo
 package and plugin manifest. This document records implementation checks and
 historical release notes; it does not announce publication of v1.5.0.
 
+## Panel fixes and the missing features — 20 October 2026
+
+**The bar and panel shifting.** The panel scrolled its content with a fixed
+step and no bound, so a page shorter than the viewport could be pushed out of
+view: the content slid up and left a gap. The scroll is now clamped to the
+content, so a short page cannot move at all and a long page stops exactly at
+its end. Two further sources of movement were removed: the speed row and the
+M1/M2 row now keep their place for every effect instead of appearing and
+disappearing, and the bar tooltip no longer appends a state that changes
+while the pointer rests on it. The effect names in the panel come from the
+controller's catalog now, so the panel shows the original tool's own names
+(`Gaming Special Key`, `Marquee effect`, `Diagonal transformation`, …)
+instead of a second, shorter list kept in the QML.
+
+**The missing features.** The three differences that the Windows app still
+had are handled:
+
+- `lecoo-gk301 restore --factory` applies the original tool's default record
+  and makes it the new manual state.
+- Lighting macros: a named, timed sequence of lighting states, stored in
+  `macros.json`, built in the panel's Macros page, played with `macro play`,
+  importable and exportable as JSON. The original recorded key sequences and
+  replayed them on the Windows host; there is no on-device macro protocol, so
+  the macros here are the device-side sequence the hardware can perform.
+- Function keys: the GK301's function and media keys with the names and codes
+  from the original `config.xml`, a command per key, and a generated Hyprland
+  fragment (`keys export`) that the user includes from their own config.
+
+Checks for this work: `cargo fmt --check`,
+`cargo check --all-targets --locked --offline`, `cargo build --release
+--locked --offline`, `omarchy plugin validate .`, the three-file QML parse,
+the service-only `qmllint` and `git diff --check` all passed. A macro was
+saved and played against the connected keyboard: the Blackbox recorded the
+four expected panel reports for a two-step macro repeated twice. The macro
+editor, the key map and the clamped scroll were exercised in a live Omarchy
+session; the panel pages render and the key command save was confirmed in
+the panel.
+
+Still not live-validated: the idle rule, the reconnect recovery, the pause
+expiry, and the setup and removal flows.
+
 ## Live session — 20 October 2026
 
 The plugin was installed into a live Omarchy session (`~/.config/omarchy/plugins/borat.lecoo-rgb`,

@@ -14,7 +14,9 @@ use crate::cli::{device_arg, has_flag, opt_switch, opt_u8, usage};
 use crate::device::{
     detect_device, device_presence_json, path_is_writable, query_firmware, send_panel, Device,
 };
+use crate::keys;
 use crate::logging::debug_log;
+use crate::macros;
 use crate::probe::{probe_brightness, probe_startup};
 use crate::protocol::{capabilities_json, catalog_json, hex, EFFECT_NAMES, PANEL_EFFECTS};
 use crate::state::{Rules, State};
@@ -327,11 +329,216 @@ pub fn dispatch(args: &[String]) -> Result<(), String> {
         }
         "probe-brightness" => probe_brightness(args, device, origin)?,
         "probe-startup" => probe_startup(args, device, origin)?,
+        "macro" => macro_command(args, device, origin)?,
+        "keys" => keys_command(args)?,
         other => {
             return Err(format!("unknown command: {}\n\nlecoo-gk301 --help", other));
         }
     }
     Ok(())
+}
+
+/// `macro list|save|remove|play|import|export`
+fn macro_command(args: &[String], device: Option<&str>, origin: &str) -> Result<(), String> {
+    let action = args
+        .get(1)
+        .map(String::as_str)
+        .ok_or("usage: lecoo-gk301 macro list|save|remove|play|import|export")?;
+    let mut macros = macros::load();
+    match action {
+        "list" => {
+            if has_flag(args, "--json") {
+                let document = serde_json::json!({
+                    "macros": macros.iter().map(macros::Macro::to_json).collect::<Vec<_>>()
+                });
+                println!("{}", document);
+            } else if macros.is_empty() {
+                println!("No macros saved");
+            } else {
+                for item in &macros {
+                    println!(
+                        "{} · {} · {} step(s) · repeat {}",
+                        item.name,
+                        item.group,
+                        item.steps.len(),
+                        item.repeat
+                    );
+                }
+            }
+        }
+        "save" => {
+            let name = match opt_value(args, "--name") {
+                Some(name) => name,
+                None => match args.get(2).map(String::as_str) {
+                    Some(name) if !name.starts_with("--") => name.to_string(),
+                    _ => {
+                        return Err(
+                            "usage: lecoo-gk301 macro save --name <name> --steps <json>".into()
+                        )
+                    }
+                },
+            };
+            let steps_json = opt_value(args, "--steps")
+                .ok_or("macro save needs --steps <json array of steps>")?;
+            let steps = macros::parse_steps(&steps_json)?;
+            let group = opt_value(args, "--group").unwrap_or_else(|| "Group 0".to_string());
+            let repeat = opt_value(args, "--repeat")
+                .and_then(|value| value.parse::<u32>().ok())
+                .unwrap_or(1)
+                .clamp(1, 64);
+            let macro_def = macros::Macro {
+                name: name.trim().to_string(),
+                group,
+                repeat,
+                steps,
+            };
+            macros::upsert(&mut macros, macro_def);
+            macros::save(&macros).map_err(|e| format!("could not save macros: {}", e))?;
+            println!("Saved macro: {}", name);
+        }
+        "remove" => {
+            let name = args
+                .get(2)
+                .map(String::as_str)
+                .ok_or("usage: lecoo-gk301 macro remove <name>")?;
+            if !macros::remove(&mut macros, name) {
+                return Err(format!("no macro named {}", name));
+            }
+            macros::save(&macros).map_err(|e| format!("could not save macros: {}", e))?;
+            println!("Removed macro: {}", name);
+        }
+        "play" => {
+            let name = args
+                .get(2)
+                .map(String::as_str)
+                .ok_or("usage: lecoo-gk301 macro play <name>")?;
+            let macro_def = macros::find(&macros, name)
+                .ok_or_else(|| format!("no macro named {}", name))?
+                .clone();
+            macros::play(&macro_def, device, origin)?;
+            println!("Played macro: {}", macro_def.name);
+        }
+        "import" => {
+            let file = args
+                .get(2)
+                .map(String::as_str)
+                .ok_or("usage: lecoo-gk301 macro import <file>")?;
+            let text = std::fs::read_to_string(file)
+                .map_err(|e| format!("could not read {}: {}", file, e))?;
+            let value: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|e| format!("{} is not valid JSON: {}", file, e))?;
+            let items = match value.get("macros").and_then(serde_json::Value::as_array) {
+                Some(items) => items.clone(),
+                None => vec![value.clone()],
+            };
+            let mut count = 0;
+            for item in &items {
+                if let Some(macro_def) = macros::Macro::from_json(item) {
+                    macros::upsert(&mut macros, macro_def);
+                    count += 1;
+                }
+            }
+            if count == 0 {
+                return Err(format!("{} contains no usable macro", file));
+            }
+            macros::save(&macros).map_err(|e| format!("could not save macros: {}", e))?;
+            println!("Imported {} macro(s) from {}", count, file);
+        }
+        "export" => {
+            let file = args
+                .get(2)
+                .map(String::as_str)
+                .ok_or("usage: lecoo-gk301 macro export <file>")?;
+            let document = serde_json::json!({
+                "macros": macros.iter().map(macros::Macro::to_json).collect::<Vec<_>>()
+            });
+            std::fs::write(file, format!("{}\n", document))
+                .map_err(|e| format!("could not write {}: {}", file, e))?;
+            println!("Exported {} macro(s) to {}", macros.len(), file);
+        }
+        other => {
+            return Err(format!(
+                "unknown macro action: {}\n\nlecoo-gk301 macro list|save|remove|play|import|export",
+                other
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// `keys list|set|export`
+fn keys_command(args: &[String]) -> Result<(), String> {
+    let action = args
+        .get(1)
+        .map(String::as_str)
+        .ok_or("usage: lecoo-gk301 keys list|set|export")?;
+    let mut entries = keys::load();
+    match action {
+        "list" => {
+            if has_flag(args, "--json") {
+                let document = serde_json::json!({
+                    "keys": entries.iter().map(keys::KeyEntry::to_json).collect::<Vec<_>>()
+                });
+                println!("{}", document);
+            } else {
+                for entry in &entries {
+                    println!(
+                        "{:<14} {:<22} {}",
+                        entry.name,
+                        entry.linux_key,
+                        if entry.command.is_empty() {
+                            "(not programmed)"
+                        } else {
+                            &entry.command
+                        }
+                    );
+                }
+            }
+        }
+        "set" => {
+            let name = args
+                .get(2)
+                .map(String::as_str)
+                .ok_or("usage: lecoo-gk301 keys set <name> --command \"<command>\"")?;
+            let command = opt_value(args, "--command")
+                .ok_or("keys set needs --command \"<command>\" (an empty value clears it)")?;
+            keys::set_command(&mut entries, name, &command)?;
+            keys::save(&entries).map_err(|e| format!("could not save keys: {}", e))?;
+            println!(
+                "{} → {}",
+                name,
+                if command.trim().is_empty() {
+                    "(cleared)"
+                } else {
+                    &command
+                }
+            );
+        }
+        "export" => {
+            let out = opt_value(args, "--out");
+            let target = keys::export(&entries, out.as_deref())?;
+            println!("Wrote {}", target.display());
+            println!(
+                "Include it from your Hyprland config:\n  dofile(\"{}\")",
+                target.display()
+            );
+        }
+        other => {
+            return Err(format!(
+                "unknown keys action: {}\n\nlecoo-gk301 keys list|set|export",
+                other
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// Reads the value of an option like `--name value`.
+fn opt_value(args: &[String], name: &str) -> Option<String> {
+    args.iter()
+        .position(|arg| arg == name)
+        .and_then(|index| args.get(index + 1))
+        .cloned()
 }
 
 /// Prints a validated firmware response, as text or as JSON.

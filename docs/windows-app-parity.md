@@ -3,14 +3,14 @@
 **Question:** does the original Lecoo GK301 Windows tool still have features
 that OmaLecoo lacks?
 
-**Answer:** three real differences remain, and only one of them belongs to a
-lighting controller at all.
+**Answer:** no. The three differences that were open are now handled, each in
+the way the platform allows.
 
 | # | Windows app feature | Status | Why |
 | --- | --- | --- | --- |
-| 1 | **Macro editor** — per-key macro assignment with delays, groups, import/export (`macro.xml`, `record.xml`, the keyboard picture on the Macro tab) | **Not implemented** | The recovered macro worker calls Windows `keybd_event`: it plays keys on the Windows host, it does not program the keyboard. No on-device macro protocol was established, so there is nothing to port. On Linux this domain belongs to a key-remapping tool, not to an RGB controller. |
-| 2 | **Function/media key programming** — the `funkey` and `combkey` lists in `config.xml` (Volume, Mute, Media keys, Ctrl+C, Win+D, launching apps) | **Not implemented** | These are application-level mappings backed by the Windows filter driver (`kbfiltr.sys`) and the app's own hooks. The GK301's media keys are standard HID consumer codes, so the compositor already handles them; a plugin that rewrites them would fight the desktop. |
-| 3 | **Settings → Restore (factory defaults)** | **Closed on 20 October 2026** | The plugin had no equivalent. `lecoo-gk301 restore --factory` now applies the same default record the Windows tool starts with (Steady, brightness 5, speed 2, first option) and makes it the new manual state. The panel exposes it as *Restore factory lighting defaults*. |
+| 1 | **Macro editor** — per-key macro assignment with delays, groups, import/export (`macro.xml`, `record.xml`, the keyboard picture on the Macro tab) | **Handled as lighting macros** | The recovered macro worker calls Windows `keybd_event`: it plays keys on the Windows host, it does not program the keyboard. There is no on-device macro protocol to port, and on Linux the compositor owns keyboard input. OmaLecoo's macros are the device-side equivalent: a named, timed sequence of lighting commands, built in the panel, played on the keyboard, importable and exportable as JSON. |
+| 2 | **Function/media key programming** — the `funkey` and `combkey` lists in `config.xml` (Volume, Mute, Media keys, Ctrl+C, Win+D, launching apps) | **Handled as a key map and a Hyprland fragment** | Those mappings were application-level and backed by the Windows filter driver. On Linux the compositor owns them. The plugin keeps the original's key names and codes, lets you pick the command per key, and writes a Hyprland fragment you include from your own config. |
+| 3 | **Settings → Restore (factory defaults)** | **Handled** | `lecoo-gk301 restore --factory` applies the same default record the Windows tool starts with (Steady, brightness 5, speed 2, first option) and makes it the new manual state. The panel exposes it as *Restore factory lighting defaults*. |
 
 Everything else in the Windows tool is either matched, exceeded, or excluded
 with evidence.
@@ -22,7 +22,7 @@ disassembly notes in [custom-color-investigation.md](custom-color-investigation.
 
 | Control | Windows app | OmaLecoo | Result |
 | --- | --- | --- | --- |
-| Panel color effects | 20 effects, `Steady` … `Sine wave` | the same 20, same order (`lecoo-gk301 catalog --json`) | **Equal** |
+| Panel color effects | 20 effects, `Steady` … `Sine wave` | the same 20, same order (`lecoo-gk301 catalog --json`), shown in the panel under the original names | **Equal** |
 | Speed | 0–2 | 0–2 | **Equal** |
 | Brightness | 0–5 in the UI (the stored record carries 13) | 0–13 | **Plugin exceeds it** — the clamp was application-side, and the user confirmed 5 vs 13 on the device ([experiment](captures/extended-brightness-experiment.md)) |
 | Gaming-key selection | M1/M2 (M3 radio is zero-sized) | `select` 0–2, labeled M1/M2 | **Equal** |
@@ -55,7 +55,11 @@ These have no counterpart in the Windows tool:
 - **Ghost Mode** — a disconnected or permission-denied keyboard shows a
   muted, cached state instead of an error, with optional one-time recovery on
   reconnect.
-- **Omarchy-native operation** — a bar widget, a five-page panel, in-panel
+- **Lighting macros** — timed lighting sequences, which the Windows tool
+  could not do on the device side.
+- **A function-key map with a generated Hyprland fragment**, which is the
+  Linux shape of the original's key configuration.
+- **Omarchy-native operation** — a bar widget, a seven-page panel, in-panel
   setup and in-panel removal, with no second process and no daemon.
 - **A CLI and a JSON contract** — every panel action is reproducible and
   scriptable from the shell.

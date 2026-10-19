@@ -83,6 +83,8 @@ Usage:\n\
   lecoo-gk301 info [--json]                firmware version\n\
   lecoo-gk301 get                          read feature report 7\n\
   lecoo-gk301 list                         effect names\n\
+  lecoo-gk301 macro list|save|remove|play|import|export   lighting macros\n\
+  lecoo-gk301 keys list|set|export         GK301 function keys and Hyprland binds\n\
 \n\
 Options: --device /dev/hidrawN (or LECOO_DEVICE)\n\
          --origin <panel|signal> for HID commands (optional; default: cli)\n\

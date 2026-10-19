@@ -61,9 +61,32 @@ Panel {
 
   property var panelNames: []
 
+  // ---- macros (timed lighting sequences) ----
+  property var macroEntries: []
+  property string macroError: ""
+  property string macroMessage: ""
+  property string macroName: ""
+  property var macroSteps: []
+  property string macroDelay: "200"
+  property bool macroBusy: false
+
+  // True while a text field in the panel has the keyboard focus.
+  property bool textEditing: false
+
+  // Scroll bookkeeping: the target position the arrows and the wheel share.
+  property real scrollTarget: 0
+
+  // ---- GK301 function keys ----
+  property var keyEntries: []
+  property string keyError: ""
+  property string keyMessage: ""
+
   // Extras the Windows app does not have.
   property bool autoCycle: false
   property int cycleSeconds: 60
+
+  // The panel pages, in the order they appear in the navigation row.
+  readonly property var pages: ["lighting", "automation", "macros", "keys", "blackbox", "setup", "uninstall"]
 
   // The CLI owns one state file, so device writes must not overlap. Every
   // command goes through this queue.
@@ -113,24 +136,95 @@ Panel {
 
   function effectLabel(index) {
     var i = Math.max(0, Number(index) || 0)
-    var labels = [
-      "Steady", "Gaming keys", "Breathing", "Key fade", "Neon stream",
-      "Streamer", "Color flow", "Dripping ripples", "Sparkle", "Flash",
-      "Fading trail", "Shining ripples", "Radiance", "Marquee", "Rotating storm",
-      "Snake chase", "Twinkling stars", "Retro snake", "Diagonal shift", "Sine wave"
-    ]
-    if (i < labels.length) return labels[i]
+    // One source of truth: the catalog the controller ships. The names are
+    // the original Windows tool's own effect names.
     if (i < root.panelNames.length) return String(root.panelNames[i]).replace(/_/g, " ")
     return "Effect " + (i + 1)
+  }
+
+  // ---- macros ----
+  function refreshMacros() { if (!macroProc.running) macroProc.running = true }
+  function refreshKeys() { if (!keysProc.running) keysProc.running = true }
+
+  // The scroll position the arrows and the wheel move towards. It is clamped
+  // to the content, so the page can never be scrolled past its own height and
+  // a short page can never be pushed out of view.
+  function clampScroll(value) {
+    var max = Math.max(0, body.implicitHeight - scroller.height)
+    return Math.max(0, Math.min(max, value))
+  }
+  function scrollPage(direction) {
+    root.scrollTarget = root.clampScroll(root.scrollTarget + direction * Style.space(48))
+    scroller.contentItem.contentY = root.scrollTarget
+  }
+
+  function addMacroStep() {
+    root.macroSteps = root.macroSteps.concat([{
+      delay_ms: Math.max(0, Math.round(Number(root.macroDelay) || 0)),
+      effect: root.effect,
+      brightness: root.brightness,
+      speed: root.speed,
+      select: root.select
+    }])
+  }
+
+  function removeMacroStep(index) {
+    var next = root.macroSteps.slice()
+    next.splice(index, 1)
+    root.macroSteps = next
+  }
+
+  function saveMacro() {
+    if (root.macroName.trim() === "") { root.macroError = "Give the macro a name"; return }
+    if (root.macroSteps.length === 0) { root.macroError = "Add at least one step"; return }
+    root.macroError = ""
+    root.macroMessage = ""
+    macroActionProc.command = [root.binary, "macro", "save", "--name", root.macroName.trim(),
+                               "--steps", JSON.stringify(root.macroSteps)]
+    macroActionProc.running = true
+  }
+
+  function playMacro(name) {
+    root.macroError = ""
+    root.macroMessage = ""
+    macroActionProc.command = [root.binary, "macro", "play", name]
+    macroActionProc.running = true
+  }
+
+  function removeMacro(name) {
+    root.macroError = ""
+    root.macroMessage = ""
+    macroActionProc.command = [root.binary, "macro", "remove", name]
+    macroActionProc.running = true
+  }
+
+  // ---- function keys ----
+  function saveKey(name, command) {
+    root.keyError = ""
+    root.keyMessage = ""
+    keyActionProc.command = [root.binary, "keys", "set", name, "--command", command]
+    keyActionProc.running = true
+  }
+
+  function exportKeys() {
+    root.keyError = ""
+    root.keyMessage = ""
+    keyActionProc.command = [root.binary, "keys", "export"]
+    keyActionProc.running = true
   }
 
 
 
   function tooltipText() {
     var name = root.effectLabel(root.effect)
+    // Cached settings are only worth saying when the keyboard is not talking
+    // back. A connected, writable device says nothing about lighting state.
+    var state = !root.deviceConnected ? " · Ghost Mode · cached"
+      : !root.deviceWritable ? " · permission denied"
+      : ""
     return "OmaLecoo · " + name + " · brightness " + root.brightness + "/13"
       + (root.autoCycle ? " · auto" : "")
-      + (!root.deviceConnected ? " · Ghost Mode · cached" : !root.deviceWritable ? " · permission denied" : " · cached")
+      + state
       + (root.signalService ? " · " + root.signalService.activeRule : "")
   }
 
@@ -409,6 +503,70 @@ Panel {
     onExited: function(code) { if (code !== 0) root.blackboxError = "Blackbox unavailable. Verify the controller in Setup." }
   }
 
+  // ---- macros ----
+  Process {
+    id: macroProc
+    command: [root.binary, "macro", "list", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          root.macroEntries = JSON.parse(String(text || "{}")).macros || []
+          root.macroError = ""
+        } catch (e) { root.macroError = "Could not read the macros" }
+      }
+    }
+    onExited: function(code) { if (code !== 0) root.macroError = "Macros unavailable. Verify the controller in Setup." }
+  }
+
+  Process {
+    id: macroActionProc
+    property string output: ""
+    property string error: ""
+    stdout: StdioCollector { onStreamFinished: macroActionProc.output = String(text || "").trim() }
+    stderr: StdioCollector { onStreamFinished: macroActionProc.error = String(text || "").trim() }
+    onExited: function(code) {
+      root.macroBusy = false
+      if (code !== 0) { root.macroError = macroActionProc.error || "The macro command failed"; return }
+      root.macroError = ""
+      root.macroMessage = macroActionProc.output
+      if (macroActionProc.output.indexOf("Saved macro") === 0) {
+        root.macroName = ""
+        root.macroSteps = []
+      }
+      root.refreshMacros()
+    }
+    onRunningChanged: if (running) root.macroBusy = true
+  }
+
+  // ---- function keys ----
+  Process {
+    id: keysProc
+    command: [root.binary, "keys", "list", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          root.keyEntries = JSON.parse(String(text || "{}")).keys || []
+          root.keyError = ""
+        } catch (e) { root.keyError = "Could not read the key map" }
+      }
+    }
+    onExited: function(code) { if (code !== 0) root.keyError = "Key map unavailable. Verify the controller in Setup." }
+  }
+
+  Process {
+    id: keyActionProc
+    property string output: ""
+    property string error: ""
+    stdout: StdioCollector { onStreamFinished: keyActionProc.output = String(text || "").trim() }
+    stderr: StdioCollector { onStreamFinished: keyActionProc.error = String(text || "").trim() }
+    onExited: function(code) {
+      if (code !== 0) { root.keyError = keyActionProc.error || "The key command failed"; return }
+      root.keyError = ""
+      root.keyMessage = keyActionProc.output
+      root.refreshKeys()
+    }
+  }
+
   function beginLifecycle(steps) {
     if (setupBusy || busy || queue.length > 0 || (signalService && signalService.busy)) return
     root.autoCycle = false
@@ -521,18 +679,19 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: effectSearch.activeFocus
+      // Any text field in the panel takes the keys; the shortcuts must not
+      // fire while somebody is typing a name or a command.
+      blocked: effectSearch.activeFocus || root.textEditing
       onTabRequested: function(direction) {
         var item = keyCatcher.nextItemInFocusChain(direction > 0)
         if (item) item.forceActiveFocus(Qt.TabFocusReason)
       }
       onCloseRequested: root.close()
       onMoveRequested: function(dx, dy) {
-        // Arrows scroll the panel instead of picking an effect: the grid is
-        // long, and a cursor that walks twenty effects would need two dozen
-        // presses to reach the bottom. The flickable is the ScrollView's
-        // content item, not the ScrollView itself.
-        if (dy !== 0) scroller.contentItem.contentY += dy * Style.space(48)
+        // Arrows scroll the panel. The scroll is clamped to the content, so
+        // a short page can never be pushed out of view, and it is animated so
+        // the content glides instead of jumping.
+        if (dy !== 0) root.scrollPage(dy)
       }
       onTextKey: function(t) {
         if (effectSearch.activeFocus) return
@@ -552,6 +711,13 @@ Panel {
           target: scroller.contentItem
           property: "interactive"
           value: body.implicitHeight > scroller.height
+        }
+        // Wheel scrolling and arrow scrolling share one clamped target.
+        Connections {
+          target: scroller.contentItem
+          function onContentYChanged() {
+            root.scrollTarget = root.clampScroll(scroller.contentItem.contentY)
+          }
         }
 
         Column {
@@ -647,15 +813,21 @@ Panel {
             width: parent.width
             spacing: Style.space(4)
             Repeater {
-              model: ["lighting", "automation", "blackbox", "setup", "uninstall"]
+              model: root.pages
               delegate: Button {
                 required property string modelData
-                width: (navigation.width - navigation.spacing * 4) / 5
+                width: (navigation.width - navigation.spacing * (root.pages.length - 1)) / root.pages.length
                 text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
                 fontSize: Style.font.caption
                 horizontalPadding: Style.space(2)
                 bordered: true
-                onClicked: { root.page = modelData; root.removalConfirmed = false; if (modelData === "blackbox") root.refreshBlackbox() }
+                onClicked: {
+                  root.page = modelData
+                  root.removalConfirmed = false
+                  if (modelData === "blackbox") root.refreshBlackbox()
+                  if (modelData === "macros") root.refreshMacros()
+                  if (modelData === "keys") root.refreshKeys()
+                }
               }
             }
           }
@@ -693,6 +865,7 @@ Panel {
             placeholderText: "Search effects…"
             selectByMouse: true
             Accessible.name: "Search lighting effects"
+            onActiveFocusChanged: root.textEditing = activeFocus
           }
 
           Grid {
@@ -769,10 +942,14 @@ Panel {
           }
 
           // ---------- speed ----------
+          // The row keeps its place for every effect so the panel does not
+          // change height when the effect changes. Speed only applies to the
+          // effects the original tool mapped it to.
           Row {
-            visible: root.effect >= 2
             width: parent.width
             spacing: Style.space(8)
+            enabled: root.effect >= 2
+            opacity: root.effect >= 2 ? 1 : 0.45
 
             Text {
               width: Style.space(88)
@@ -799,10 +976,12 @@ Panel {
           }
 
           // ---------- game group (M1 / M2) ----------
+          // Like the speed row, this one keeps its place for every effect.
           Row {
-            visible: root.effect === 1
             width: parent.width
             spacing: Style.space(8)
+            enabled: root.effect === 1
+            opacity: root.effect === 1 ? 1 : 0.45
 
             Text {
               width: Style.space(88)
@@ -950,6 +1129,210 @@ Panel {
               text: "Priority: idle for 5 minutes → off; active fullscreen window → Game; otherwise → last manual settings. Manual actions pause automation for 30 minutes. Idle inhibitors are respected."
             }
             Note { width: parent.width; text: root.signalService ? root.signalService.lastOutcome : "" }
+          }
+
+          Column {
+            visible: root.page === "macros"
+            width: parent.width
+            spacing: Style.space(8)
+            PanelSectionHeader { text: "MACROS"; foreground: Color.foreground }
+            Note {
+              width: parent.width
+              text: "A macro is a timed sequence of lighting states, played on the keyboard. The original Windows tool recorded key sequences; on Linux the compositor owns keyboard input, so OmaLecoo macros move the lights."
+            }
+
+            Repeater {
+              model: root.macroEntries
+              delegate: Row {
+                required property var modelData
+                width: parent.width
+                spacing: Style.space(6)
+
+                Column {
+                  width: parent.width - macroActions.width - Style.space(6)
+                  spacing: Style.space(2)
+                  Text {
+                    width: parent.width
+                    text: String(modelData.name || "")
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    elide: Text.ElideRight
+                  }
+                  Note {
+                    width: parent.width
+                    text: String(modelData.group || "") + " · " + (modelData.steps ? modelData.steps.length : 0)
+                      + " step(s) · repeat " + String(modelData.repeat || 1)
+                  }
+                }
+
+                Row {
+                  id: macroActions
+                  spacing: Style.space(4)
+                  Button {
+                    text: "Play"
+                    fontSize: Style.font.caption
+                    horizontalPadding: Style.space(2)
+                    bordered: true
+                    onClicked: root.playMacro(String(modelData.name || ""))
+                  }
+                  Button {
+                    text: "Remove"
+                    fontSize: Style.font.caption
+                    horizontalPadding: Style.space(2)
+                    bordered: true
+                    onClicked: root.removeMacro(String(modelData.name || ""))
+                  }
+                }
+              }
+            }
+            Note {
+              width: parent.width
+              visible: root.macroEntries.length === 0
+              text: "No macros saved yet."
+            }
+
+            PanelSeparator { foreground: Color.foreground }
+            PanelSectionHeader { text: "NEW MACRO"; foreground: Color.foreground }
+
+            Ui.TextField {
+              id: macroNameField
+              width: parent.width
+              placeholderText: "Macro name…"
+              selectByMouse: true
+              Accessible.name: "Macro name"
+              onTextChanged: root.macroName = text
+              onActiveFocusChanged: root.textEditing = activeFocus
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.space(6)
+              Ui.TextField {
+                id: macroDelayField
+                width: parent.width - captureStep.width - Style.space(6)
+                placeholderText: "Delay before the step in ms"
+                text: root.macroDelay
+                selectByMouse: true
+                Accessible.name: "Step delay in milliseconds"
+                onTextChanged: root.macroDelay = text
+                onActiveFocusChanged: root.textEditing = activeFocus
+              }
+              Button {
+                id: captureStep
+                text: "Add current lighting"
+                fontSize: Style.font.caption
+                horizontalPadding: Style.space(2)
+                bordered: true
+                onClicked: root.addMacroStep()
+              }
+            }
+
+            Repeater {
+              model: root.macroSteps
+              delegate: Row {
+                required property var modelData
+                required property int index
+                width: parent.width
+                spacing: Style.space(6)
+                Note {
+                  width: parent.width - dropStep.width - Style.space(6)
+                  text: (index + 1) + ". after " + String(modelData.delay_ms) + " ms · effect "
+                    + (Number(modelData.effect) + 1) + " · brightness " + String(modelData.brightness)
+                    + "/13 · speed " + String(modelData.speed) + "/2"
+                }
+                Button {
+                  id: dropStep
+                  text: "×"
+                  fontSize: Style.font.caption
+                  horizontalPadding: Style.space(2)
+                  bordered: true
+                  onClicked: root.removeMacroStep(index)
+                }
+              }
+            }
+            Note {
+              width: parent.width
+              visible: root.macroSteps.length === 0
+              text: "Add the lighting states the macro should play, in order."
+            }
+
+            Button {
+              text: "Save macro"
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(2)
+              bordered: true
+              onClicked: root.saveMacro()
+            }
+            Note { width: parent.width; text: root.macroError }
+            Note { width: parent.width; text: root.macroMessage }
+          }
+
+          Column {
+            visible: root.page === "keys"
+            width: parent.width
+            spacing: Style.space(8)
+            PanelSectionHeader { text: "FUNCTION KEYS"; foreground: Color.foreground }
+            Note {
+              width: parent.width
+              text: "The GK301's function and media keys, as the original Windows tool listed them in its config.xml. The commands run through Hyprland; the plugin writes a fragment you include from your own Hyprland config."
+            }
+
+            Repeater {
+              model: root.keyEntries
+              delegate: Row {
+                required property var modelData
+                width: parent.width
+                spacing: Style.space(6)
+
+                Column {
+                  width: Style.space(140)
+                  spacing: Style.space(2)
+                  Text {
+                    width: parent.width
+                    text: String(modelData.name || "")
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                  Note {
+                    width: parent.width
+                    text: String(modelData.linux_key || "")
+                    font.family: "monospace"
+                  }
+                }
+
+                Ui.TextField {
+                  id: keyCommandField
+                  width: parent.width - keySave.width - Style.space(6)
+                  text: String(modelData.command || "")
+                  placeholderText: "Command for this key"
+                  selectByMouse: true
+                  Accessible.name: "Command for " + String(modelData.name || "")
+                  onEditingFinished: root.saveKey(String(modelData.name || ""), text)
+                  onActiveFocusChanged: root.textEditing = activeFocus
+                }
+                Button {
+                  id: keySave
+                  text: "Save"
+                  fontSize: Style.font.caption
+                  horizontalPadding: Style.space(2)
+                  bordered: true
+                  onClicked: root.saveKey(String(modelData.name || ""), keyCommandField.text)
+                }
+              }
+            }
+
+            Button {
+              text: "Write Hyprland fragment"
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(2)
+              bordered: true
+              onClicked: root.exportKeys()
+            }
+            Note { width: parent.width; text: root.keyError }
+            Note { width: parent.width; text: root.keyMessage }
           }
 
           Column {

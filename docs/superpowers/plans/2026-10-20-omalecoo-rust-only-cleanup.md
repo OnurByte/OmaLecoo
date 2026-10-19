@@ -139,3 +139,31 @@ still needs live validation, as recorded in
 The idle rule, the reconnect recovery, the pause expiry and the setup and
 removal flows still need live validation; they are listed as pending in
 [docs/verification.md](../verification.md).
+
+---
+
+### Task 5: Panel stability and the missing features
+
+**Files:**
+- Create: `src/macros.rs`, `src/keys.rs`
+- Modify: `src/commands.rs`, `src/cli.rs`, `src/protocol.rs`, `Panel.qml`,
+  `README.md`, `docs/verification.md`, `docs/windows-app-parity.md`
+
+- [x] **Step 1:** Bound the panel scroll to its content, so a short page can
+  no longer be pushed out of view.
+- [x] **Step 2:** Keep the speed and M1/M2 rows in place for every effect, so
+  the panel no longer changes height when the effect changes.
+- [x] **Step 3:** Take the effect names from the controller's catalog, so the
+  panel and the CLI show the original tool's names and there is one list.
+- [x] **Step 4:** Fix the bar tooltip, which claimed the settings were cached
+  even when the keyboard was connected and writable.
+- [x] **Step 5:** Add `restore --factory`, the equivalent of the Windows
+  tool's *Settings → Restore*.
+- [x] **Step 6:** Add the macro model: storage, playback on the keyboard,
+  import/export and the panel page.
+- [x] **Step 7:** Add the function-key map and the generated Hyprland
+  fragment, with the panel page.
+- [x] **Step 8:** Stop the panel shortcuts from firing while a text field has
+  the keyboard focus.
+- [x] **Step 9:** Run the static and build checks, exercise the macro and the
+  panel in a live session, and update the documentation.

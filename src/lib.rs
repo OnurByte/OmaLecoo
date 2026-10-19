@@ -13,6 +13,8 @@
 //! | [`logging`] | Debug log, JSON escaping, UTC timestamps |
 //! | [`lock`] | Cross-process command lock shared by every writer |
 //! | [`udev`] | The single owned udev rule and its install/remove path |
+//! | [`macros`] | Named lighting sequences and their playback |
+//! | [`keys`] | The GK301 function keys and the Hyprland fragment for them |
 //! | [`cli`] | Argument parsing helpers and the usage text |
 //! | [`commands`] | Command implementations behind one dispatch function |
 //! | [`probe`] | Hidden research diagnostics (brightness sweep, startup replay) |
@@ -30,8 +32,10 @@ pub mod blackbox;
 pub mod cli;
 pub mod commands;
 pub mod device;
+pub mod keys;
 pub mod lock;
 pub mod logging;
+pub mod macros;
 pub mod probe;
 pub mod protocol;
 pub mod state;
