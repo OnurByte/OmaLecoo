@@ -124,7 +124,7 @@ impl State {
             st.effect = (v as usize) % PANEL_EFFECTS;
         }
         if let Some(v) = find_u64(&text, "brightness") {
-            st.brightness = bounded_value(v, 5);
+            st.brightness = bounded_value(v, 13);
         }
         if let Some(v) = find_u64(&text, "speed") {
             st.speed = bounded_value(v, 2);
@@ -210,7 +210,7 @@ impl State {
 
     fn json(&self) -> String {
         format!(
-            "{{\"effect\":{},\"name\":\"{}\",\"brightness\":{},\"speed\":{},\"select\":{},\"panel_count\":{},\"panel_brightness_max\":5,\"speed_max\":2,\"select_max\":2}}",
+            "{{\"effect\":{},\"name\":\"{}\",\"brightness\":{},\"speed\":{},\"select\":{},\"panel_count\":{},\"panel_brightness_max\":13,\"speed_max\":2,\"select_max\":2}}",
             self.effect,
             self.name(),
             self.brightness,
@@ -224,8 +224,8 @@ impl State {
         if self.effect >= PANEL_EFFECTS {
             return Err(format!("panel effect must be in 0..{}", PANEL_EFFECTS - 1));
         }
-        if self.brightness > 5 {
-            return Err("panel brightness must be in 0..5".into());
+        if self.brightness > 13 {
+            return Err("panel brightness must be in 0..13".into());
         }
         if self.speed > 2 {
             return Err("speed must be in 0..2".into());
@@ -585,7 +585,7 @@ fn has_flag(args: &[String], name: &str) -> bool {
 
 fn capabilities_json() -> String {
     format!(
-        "{{\"panel_effects\":{},\"panel_brightness_max\":5,\"speed_max\":2,\"select_max\":2,\"lighting_control\":\"physically_confirmed\",\"firmware_response\":\"supported\",\"side_control\":\"unsupported\",\"custom_rgb\":\"unverified\",\"per_key_rgb\":\"unverified\"}}",
+        "{{\"panel_effects\":{},\"panel_brightness_max\":13,\"panel_brightness_max_windows\":5,\"speed_max\":2,\"select_max\":2,\"lighting_control\":\"physically_confirmed\",\"firmware_response\":\"supported\",\"side_control\":\"unsupported\",\"custom_rgb\":\"unverified\",\"per_key_rgb\":\"unverified\"}}",
         PANEL_EFFECTS
     )
 }
@@ -685,8 +685,8 @@ Usage:\n\
   lecoo-gk301 dev                          show device node\n\
   lecoo-gk301 status [--json]              show last applied state\n\
   lecoo-gk301 next | prev                  change panel effect\n\
-  lecoo-gk301 panel <0-19> [--brightness 0-5] [--speed 0-2] [--select 0-2]\n\
-  lecoo-gk301 brightness <0-5>             panel brightness\n\
+  lecoo-gk301 panel <0-19> [--brightness 0-13] [--speed 0-2] [--select 0-2]\n\
+  lecoo-gk301 brightness <0-13>            panel brightness (Windows app clamps to 5)\n\
   lecoo-gk301 preset <name>                silent|game|night|party|off|random\n\
   lecoo-gk301 catalog [--json]             effect catalog\n\
   lecoo-gk301 info [--json]                firmware version\n\
@@ -887,7 +887,7 @@ fn run() -> Result<(), String> {
             send_panel(&dev, &st)?;
             st.save()?;
             println!(
-                "panel: {} ({}) brightness {}/5 speed {}/2 selection {}",
+                "panel: {} ({}) brightness {}/13 speed {}/2 selection {}",
                 st.effect,
                 st.name(),
                 st.brightness,
@@ -898,7 +898,7 @@ fn run() -> Result<(), String> {
         "brightness" => {
             let v = args
                 .get(1)
-                .ok_or("usage: lecoo-gk301 brightness <0-5>")?
+                .ok_or("usage: lecoo-gk301 brightness <0-13>")?
                 .parse::<u8>()
                 .map_err(|_| "brightness must be a number".to_string())?;
             let mut st = State::load();
@@ -907,7 +907,7 @@ fn run() -> Result<(), String> {
             let dev = Device::open_detected(device_arg)?;
             send_panel(&dev, &st)?;
             st.save()?;
-            println!("brightness: {}/5", st.brightness);
+            println!("brightness: {}/13", st.brightness);
         }
         "preset" => {
             let name = args

@@ -41,7 +41,8 @@ physical observation. Firmware on the tested unit: **1.16**.
 | Feature | Status |
 | --- | --- |
 | 20 main lighting effects | ✅ works |
-| Brightness 0–5, speed 0–2, gaming keys M1/M2 | ✅ works |
+| Brightness 0–13 (the Windows app only offered/clamped 0–5 — scale found via REA + live probes, user-confirmed visibly) | ✅ works |
+| Speed 0–2, gaming keys M1/M2 | ✅ works |
 | Presets (quiet / gaming / night / party / off / random) | ✅ works |
 | Named local profiles (save / load / delete) | ✅ works |
 | Auto effect rotation, reapply on demand | ✅ works |
@@ -90,11 +91,11 @@ omarchy plugin enable borat.lecoo-rgb --section right
 ## Controls
 
 Bar icon: left click opens the panel, right click = next effect, scroll =
-brightness. In the panel: search, effect grid, brightness slider, speed
-(Slow/Medium/Fast), M1/M2 for the Gaming effect, presets, auto cycle, profile
-save/load. Shortcuts: `n`/`p` next/previous effect, `o` off, `r` refresh,
-`Esc` close. Diagnostics (`doctor` output) appear inside the panel when you
-ask for them.
+brightness. In the panel: search, effect grid, brightness slider (0–13,
+finer than the original Windows app), speed (Slow/Medium/Fast), M1/M2 for
+the Gaming effect, presets, auto cycle, profile save/load. Shortcuts: `n`/`p`
+next/previous effect, `o` off, `r` refresh, `Esc` close. Diagnostics
+(`doctor` output) appear inside the panel when you ask for them.
 
 ## CLI
 

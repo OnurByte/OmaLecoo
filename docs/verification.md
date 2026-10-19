@@ -1,4 +1,4 @@
-# Release verification — 1.2.0
+# Release verification — 1.3.0
 
 Run from the project directory:
 
@@ -11,6 +11,19 @@ python3 tests/integration.py
 python3 tests/panel-only.py
 bash -n install.sh scripts/install-udev.sh
 ```
+
+## What changed in 1.3.0 (extended brightness)
+
+- **Brightness 0–13**: the firmware accepts the full stored-record scale the
+  Windows tool only carried internally (its UI clamps to 5). Confirmed by
+  the user on the physical keyboard during the observation run in
+  `docs/captures/extended-brightness-experiment.md`. The CLI bounds, panel
+  slider (0–13) and capability report were extended
+  (`panel_brightness_max` 13, `panel_brightness_max_windows` 5).
+- `brightness <0-13>` and `panel --brightness` updated; old saved states and
+  profiles remain valid.
+
+## Historical — 1.2.0 (OmaLecoo)
 
 ## What changed in 1.2.0 (OmaLecoo)
 

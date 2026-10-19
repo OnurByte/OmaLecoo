@@ -104,7 +104,7 @@ Panel {
 
   function tooltipText() {
     var name = root.effectLabel(root.effect)
-    return "OmaLecoo · " + name + " · brightness " + root.brightness + "/5"
+    return "OmaLecoo · " + name + " · brightness " + root.brightness + "/13"
       + (root.firmware !== "" ? " · fw " + root.firmware : "")
       + (root.autoCycle ? " · auto" : "")
       + (root.connectionError !== "" ? " · disconnected" : "")
@@ -166,7 +166,7 @@ Panel {
 
   function setBrightness(value) {
     if (root.stateSyncPending) return
-    var b = Math.max(0, Math.min(5, Math.round(Number(value) || 0)))
+    var b = Math.max(0, Math.min(13, Math.round(Number(value) || 0)))
     if (b === root.brightness) return
     root.brightness = b
     root.enqueue(["brightness", String(b)])
@@ -425,7 +425,7 @@ Panel {
                 width: parent.width
                 text: "FW " + (root.firmware !== "" ? root.firmware : "—")
                       + "  ·  " + root.effectLabel(root.effect)
-                      + "  ·  " + root.brightness + "/5"
+                      + "  ·  " + root.brightness + "/13"
                       + (root.autoCycle ? "  ·  auto " + root.cycleSeconds + " s" : "")
                 color: Color.muted
                 font.family: Style.font.family
@@ -560,10 +560,10 @@ Panel {
               width: parent.width - Style.space(88) - brightnessValue.width - Style.space(16)
               bar: root.bar
               minimum: 0
-              maximum: 5
+              maximum: 13
               step: 1
               integer: true
-              tickCount: 6
+              tickCount: 14
               value: root.brightness
               onReleased: function(v) { root.setBrightness(v) }
             }
@@ -572,7 +572,7 @@ Panel {
               id: brightnessValue
               width: Style.space(34)
               height: brightnessSlider.implicitHeight
-              text: Math.round(brightnessSlider.liveValue) + "/5"
+              text: Math.round(brightnessSlider.liveValue) + "/13"
               color: Color.muted
               horizontalAlignment: Text.AlignRight
               verticalAlignment: Text.AlignVCenter

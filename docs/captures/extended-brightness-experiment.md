@@ -73,13 +73,23 @@ no daemon was installed and no capture process remains.
 
 ## Interpretation and limits
 
-Accepted does not mean observed, so physical confirmation by the user is
-required before any extended-scale control is exposed in the UI. The
-hypotheses this experiment makes testable:
+**Result confirmed by the user (19 October 2026):** during a second,
+deliberate observation run (3-second holds: brightness 5 → 13 → 5 → 13 on
+effect 0 with speed unchanged) the user reported a clear visible brightness
+difference between 5 and 13. The firmware brightness byte is therefore not
+an application-limited 0..5 slider: the original Windows UI simply clamped.
+The extended scale is wired into the tool and panel as brightness 0–13 from
+v1.3.0. After the final restore packet the user also observed the expected
+animation start for their own restored effect (a flowing/wave effect), which
+matches the restored record rather than a fault.
+
+Accepted does not replace observation, and the remaining byte semantics stay
+unproven:
 
 - the firmware brightness byte is not limited to 0..5; the Windows tool's
   own startup carries 13 on the wire (XML-stored default), and the panel
-  clamp to 5 is application-side;
+  clamp to 5 is application-side; **user-confirmed visually — wired as a
+  0..13 control from v1.3.0**;
 - byte 3 (index), byte 5 (speed/direction carry) and byte 6 (selection)
   semantics beyond the panel mapping are still unproven;
 - the device did not report any vendor input event during lighting changes,
