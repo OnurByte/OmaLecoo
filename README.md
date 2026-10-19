@@ -1,170 +1,261 @@
+<div align="center">
+
 # OmaLecoo
 
-Lecoo GK301 keyboard RGB lighting for Omarchy — a native bar plugin + Rust
-CLI (SEMICO `1a2c:9df4`). 20 lighting effects, brightness (0–13), speed,
-presets, connection diagnostics — all through real HID Feature reports that
-I recovered by reverse engineering the official Windows tool.
+### Your GK301, at home in Omarchy.
 
-## Install
+**20 lighting effects · 14 brightness levels · a local HID flight log**
+
+Native bar controls and an event-aware lighting service for the Lecoo GK301.
+Built with **Rust + Quickshell** for SEMICO **`1a2c:9df4`**.
+
+**v1.5.0 development** · [Setup](#setup) · [Preview](#preview-it-in-omarchy) · [Evidence](#follow-the-evidence) · [CLI](#cli)
+
+</div>
+
+> Fullscreen selects Game. Five idle minutes turn the lights off. Your next
+> manual adjustment takes priority for 30 minutes. Enable Signal Engine when
+> you want your keyboard to follow your desktop.
+
+| Signal Engine | HID Blackbox | Ghost Mode |
+| --- | --- | --- |
+| Opt-in fullscreen and idle rules, with the active reason shown in the panel. | UTC time, command origin, report bytes and syscall outcome, stored locally. | Muted cached settings while disconnected, with optional one-time recovery on reconnect. |
+
+The lighting protocol comes from reverse engineering the official Windows
+controller, matching USB control captures, and asking the user what the
+physical LEDs actually did. The new service builds on those existing commands;
+its runtime and reconnect behavior still need live validation. See the
+[verification record](docs/verification.md) for the checks performed so far.
+
+## Setup
+
+Install and enable the Omarchy plugin:
 
 ```bash
 omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
 ```
 
-That installs and enables the bar plugin (the repo root is the plugin
-folder: `manifest.json`, `BarWidget.qml`, `Panel.qml` — the layout the
-[marketplace guide](https://plugins.omarchy.org/develop.html) documents).
-The keyboard controller binary is separate; pick one way to provide it:
+The repository root is the plugin folder. Omarchy loads its bar widget and
+service, but does not run an installation hook. **Left-click the keyboard icon
+and open Setup** to install the controller and authorize device access.
+
+1. **Provide Rust and Cargo.** If Setup reports that Cargo is missing, its
+   prerequisite command is `omarchy pkg add rust`. After installing it, select
+   **Refresh Cargo availability**.
+2. **Select Install controller from source.** The panel runs the command below
+   and verifies the installed controller with `capabilities --json`.
+3. **Select Authorize device access…** A polkit prompt asks you to authorize the
+   GK301 udev rule. Reconnect the keyboard if access is still denied.
+
+The source installation command is:
 
 ```bash
-# from source (needs Rust/cargo)
-cargo install --git https://github.com/OnurByte/OmaLecoo
+cargo install --git https://github.com/OnurByte/OmaLecoo --root "$HOME/.local" --locked
 ```
+
+It installs crate `omalecoo` as **`~/.local/bin/lecoo-gk301`**, the panel's
+default controller path. A custom path can be set in the widget's `binary`
+setting; installing into `~/.local` does not replace that setting.
+
+Device authorization runs the equivalent of:
 
 ```bash
-# or the prebuilt binary from a GitHub release
-mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/lecoo-gk301 \
-  https://github.com/OnurByte/OmaLecoo/releases/latest/download/lecoo-gk301
-chmod +x ~/.local/bin/lecoo-gk301
+pkexec "$HOME/.local/bin/lecoo-gk301" udev install
 ```
 
-If the binary lives somewhere else on `PATH`, set it in the plugin's bar
-settings (`binary` property). Either way, grant the HID node user access —
-one sudo pass, once:
+The controller manages only `/etc/udev/rules.d/70-lecoo-gk301.rules`, matching
+vendor `1a2c`, product `9df4`, interface `01` with `uaccess`, then reloads and
+triggers udev. It refuses to overwrite a rule whose contents differ. Routine
+lighting controls run as your user after authorization.
 
-```bash
-sudo bash scripts/install-udev.sh   # from inside the plugin directory
-```
+Both Git install commands follow the repository's default branch. This
+checkout identifies itself as v1.5.0 development; these notes do not announce
+a published v1.5 release or promise a v1.5 release asset.
 
-Installing from a plain checkout instead: run `./install.sh` from the repo;
-it builds the controller, installs the binary and plugin files and takes at
-most one sudo (the udev rule). Daily use never needs sudo: the rule tags the
-vendor HID node with `uaccess`. If the bar keeps an older copy, run
-`omarchy restart shell`.
+## A keyboard that follows the desktop
 
-## The story (why this exists)
+**Signal Engine** runs inside Omarchy's existing Quickshell process. There is
+no separate Rust daemon. Enable it on the **Automation** page; automation and
+reconnect recovery both default to off, including when rules are malformed.
 
-I use Omarchy. I love DHH's stuff — Ruby on Rails, the *just build the thing*
-energy, and now Omarchy itself — so when a cheap RGB keyboard shows up on my
-desk, the last thing I want is a Windows-only control panel sitting there,
-useless.
+| Priority | Condition | Command |
+| --- | --- | --- |
+| 1 | A manual panel/bar action | Pause automation for 30 minutes |
+| 2 | Idle for five minutes; idle inhibitors respected | `preset off` |
+| 3 | The active window is fullscreen | `preset game` |
+| 4 | Otherwise | `restore` the saved manual settings |
 
-The Lecoo GK301 ships with exactly that: a Windows-only installer. Finding it
-was its own quest. Distributors hide the driver behind vague "software"
-buttons; I dug through store pages and support sites until I finally found
-the actual download hidden in a Google Drive folder (same link the Turkish
-Lecoo distributor Wawa Teknoloji hands out):
+Automatic changes preserve the manual restore point. Events are coalesced for
+250 ms, and the service waits at least two seconds after a command finishes
+before sending another HID command. Rust keeps its shared process lock and
+110 ms protocol pacing for all writers. Lock-screen automation is deferred
+until a stable public Omarchy lock-state signal is available.
 
-**Original Windows tool (Lecoo_GK301 setup v1.0.1.1):**
-<https://drive.google.com/drive/folders/1_o3YHjDMwQCvY8Bd8kiL-gRfki8ezlaU>
+**Ghost Mode** checks presence and writability every ten seconds without
+sending HID reports. Disconnection shows a muted last-known state; permission
+denied and a missing controller get their own messages. Enable **Restore
+settings once after reconnect** for one `restore --origin signal` after a
+reconnect. The service suppresses writes while the device is absent or denied.
 
-So now I had the exe. Did it run under Wine/Lutris/Bottles? Nope. Crashes,
-missing components, nothing. I wasn't going to reboot into Windows for a
-keyboard, so I did the normal thing instead:
+Automation and service-driven recovery require **Omarchy's built-in bar**.
+Replacement bars can retain manual controls, but do not provide this service
+integration.
 
-- ran the exe in a throwaway Windows environment once, exported its UI XMLs,
-- dissected it with REA (static disassembly + evidence capture),
-- recorded the real USB traffic with a usbmon capture while applying effects,
-- rebuilt the confirmed protocol as a tiny Rust binary + Quickshell panel.
+## See what was sent
 
-The result is OmaLecoo: a plugin that talks to the keyboard natively on
-Omarchy — no Wine, no VM, no sudo after install.
+**HID Blackbox** records OmaLecoo's vendor-HID exchanges with UTC timestamps,
+origin (`panel`, `signal`, or `cli`), report bytes, syscall return/error, and a
+short outcome. The panel shows the newest 40 entries; `blackbox --json` reads
+the retained history, newest first.
 
-## What it actually does (no fairy tales)
+The current `blackbox.jsonl` rotates at 1 MiB and retains one previous file,
+`blackbox.jsonl.1`. Recording is best-effort: a log failure does not turn a
+successful device command into a failure. A successful transfer records the
+syscall result; it does not establish that the LEDs visibly changed.
 
-Confirmed by live usbmon capture, REA analysis of the Windows binary, and
-physical observation. Firmware on the tested unit: **1.16**.
+Settings, rules, Blackbox history and the debug log stay under
+`$XDG_STATE_HOME/lecoo-gk301`, or `~/.local/state/lecoo-gk301` by default.
+The recorder does not open the keyboard input stream or record typed keys.
+Firmware replies are labeled **acknowledgements**, and cached lighting values
+are labeled **cached settings**. The firmware query is not lighting readback.
 
-| Feature | Status |
+## What the hardware evidence supports
+
+The tested GK301 reports firmware **1.16**. Software automation adds ways to
+schedule the existing packets; it does not add new keyboard capabilities.
+
+| Capability | Evidence and boundary |
 | --- | --- |
-| 20 main lighting effects | ✅ works |
-| Brightness 0–13 (the Windows app only offered/clamped 0–5 — scale found via REA + live probes, user-confirmed visibly) | ✅ works |
-| Speed 0–2, gaming keys M1/M2 | ✅ works |
-| Presets (quiet / gaming / night / party / off / random) | ✅ works |
-| Auto effect rotation, reapply on demand | ✅ works |
-| Connection diagnostics + debug log | ✅ works |
-| Firmware response query (`response`) | ✅ works |
-| Side RGB, per-key RGB, custom colors | ❌ removed |
-| On-device macro programming | ❌ never existed |
+| Main lighting effects | 20 recovered effect choices; main-effect changes confirmed on the physical keyboard. [Protocol and captures](docs/FINAL-ANALYSIS.md), [user observations](docs/physical-validation.md). |
+| Brightness 0–13 | Windows UI clamps to 5; its stored record carries 13. The user confirmed a visible difference between 5 and 13. [Experiment](docs/captures/extended-brightness-experiment.md). |
+| Speed 0–2; Gaming M1/M2 | Recovered main-panel mapping: speed for effects 2–19, game-key selection for effect 1. [Analysis](docs/FINAL-ANALYSIS.md). |
+| Presets, rotation, restore | Software compositions of the existing main-panel command. No extra packet family or on-device preset storage is claimed. |
+| Signal Engine, Blackbox, Ghost Mode | Implemented software features; static/build checks and live-validation limits are listed in [verification](docs/verification.md). |
+| Firmware response | Validated F1 reply contains firmware data. The tested GET path does not report current lighting. [Readback experiment](docs/FINAL-ANALYSIS.md#new-readback-experiment). |
+| Side RGB | Excluded: the recovered writer belongs to a hidden Mouse page and caused no visible change on this keyboard. [Failure analysis](docs/side-failure-analysis.md). |
+| Custom colors / per-key RGB | No arbitrary RGB triplet or per-key sender established. [Color investigation](docs/custom-color-investigation.md). |
+| On-device macros | Not implemented: the recovered macro worker plays keys on the Windows host. [Analysis](docs/FINAL-ANALYSIS.md#excluded-capabilities). |
 
-The side-LED and reset paths found in the Windows tool belong to a hidden
-Mouse page and never produced a visible change on this keyboard — so they are
-**not exposed**. GUI presets send exactly one main-panel packet.
-Arbitrary RGB colors were *not* recoverable from the tool: its lighting
-writer carries effect/brightness/speed/selection and no RGB triplet. I keep
-the honesty: whatever is not confirmed is not shipped.
+### Eight bytes to the keyboard
 
-Recovered protocol (8-byte Feature reports, report ID 7, interface 1):
+Vendor HID **interface 1**, **Feature report ID 7**, eight bytes including ID:
 
-```
-panel effect : 07 FF FF <effect 0-19> <brightness 0-13> <speed 0-2> <select 0-2> 00
-firmware     : 07 F1 00 00 00 00 00 00 (set, then get)
-```
+```text
+byte       0   1   2   3   4   5   6   7
+panel     07  FF  FF  ee  bb  ss  kk  00
+query     07  F1  00  00  00  00  00  00
+reply     07  01  16  00  00  00  00  00
 
-`lecoo-gk301 response` sends the firmware query and surfaces the device's
-validated reply (version, raw bytes, roundtrip time). One honest caveat: this
-firmware path reports its version but not the current lighting state, so the
-panel always shows the last settings sent from this computer.
-
-## Controls
-
-Bar icon: left click opens the panel, right click = next effect, scroll =
-brightness. In the panel: search, effect grid, brightness slider (0–13,
-finer than the original Windows app), speed (Slow/Medium/Fast), M1/M2 for
-the Gaming effect, presets, auto cycle. Shortcuts: `n`/`p`
-next/previous effect, `o` off, `r` refresh, `Esc` close. Diagnostics
-(`doctor` output) appear inside the panel when you ask for them.
-
-## Remove
-
-```bash
-omarchy plugin remove borat.lecoo-rgb
-rm -f ~/.local/bin/lecoo-gk301
-# optional: drop the device access rule too
-sudo rm -f /etc/udev/rules.d/70-lecoo-gk301.rules
+ee = effect 0–19    bb = brightness 0–13
+ss = speed 0–2      kk = selection 0–2
+Observed firmware reply: 1.16
 ```
 
-The panel state stays in `~/.local/state/lecoo-gk301/`; delete it if you
-want keyboard settings cleared as well.
+The F1 request is SET_FEATURE followed by GET_FEATURE. Repeating GET after a
+lighting command returned the same firmware reply on the tested unit. This
+bounds the claim to that query path; it does not prove no other query exists.
+
+## Preview it in Omarchy
+
+With this plugin checkout loaded in the built-in bar, left-click its keyboard
+icon. **Lighting → Automation → Blackbox → Setup → Uninstall** are the five
+panel pages. Open Lighting for the searchable effect grid, brightness, speed,
+Gaming M1/M2, presets and auto cycle; open Automation for the current rule and
+its reason. Blackbox provides the command history behind the controls.
+
+Right-click the bar icon for the next effect; scroll for brightness. Panel
+shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
+
+This is the live preview path: the panel uses Omarchy's own UI components and
+runs in its shell. No product screenshots are checked into this revision.
+To capture the actual UI, open one of those pages in your installed Omarchy
+session and use its screenshot action. Hardware appearance still requires
+looking at the connected keyboard.
 
 ## CLI
 
+The installed binary keeps the name `lecoo-gk301`. A controller at a custom
+path can be invoked directly; otherwise use `~/.local/bin/lecoo-gk301` if that
+directory is not on your `PATH`.
+
 ```bash
-lecoo-gk301 doctor              # device, paths, validated firmware reply
-lecoo-gk301 response --json     # validated firmware response with timing
-lecoo-gk301 status --json       # last applied settings
+# Local metadata and history; no HID report is sent
+lecoo-gk301 --help
+lecoo-gk301 dev --json
+lecoo-gk301 status --json           # saved manual restore point, not live LED state
+lecoo-gk301 capabilities --json
+lecoo-gk301 catalog --json
+lecoo-gk301 list
+lecoo-gk301 rules --json
+lecoo-gk301 blackbox --json
+
+# Write both automation settings; enabling the rules requires the QML service
+lecoo-gk301 rules set --automation on --restore-on-reconnect off
+
+# Lighting commands; these change the keyboard
 lecoo-gk301 panel 2 --brightness 5 --speed 1 --select 0
-lecoo-gk301 preset night
-lecoo-gk301 capabilities --json # truthful capability report
+lecoo-gk301 brightness 8
+lecoo-gk301 next
+lecoo-gk301 prev
+lecoo-gk301 preset night            # silent | game | night | party | off | random
+lecoo-gk301 restore
+
+# Diagnostics that access vendor HID
+lecoo-gk301 doctor
+lecoo-gk301 response --json         # validated firmware response and timing
+lecoo-gk301 info --json             # firmware bytes/version
+lecoo-gk301 get                     # GET_FEATURE; not lighting state
 ```
 
-`side`, `raw` and `reset` debug commands from earlier builds were removed;
-the analysis records still describe them in `docs/` for anyone continuing
-the protocol work.
+HID commands accept `--device /dev/hidrawN` or `LECOO_DEVICE` to override
+detection. `dev --json` always describes automatic discovery. HID commands
+also accept `--origin panel` or `--origin signal`; omitting the option records
+`cli`. Signal-origin lighting writes preserve the saved manual state. A
+30-minute manual pause is coordinated by the panel/bar service; direct CLI
+commands do not initiate that pause.
 
-## Project layout
+The narrow maintenance commands are `lecoo-gk301 state clear` and
+`lecoo-gk301 udev install` / `lecoo-gk301 udev remove` (the latter require root,
+normally through the panel's polkit action). `side`, `raw` and `reset` are not
+product commands. The hidden `probe-brightness` diagnostic remains a research
+tool; historical documents may describe retired probes and controls.
 
-- `src/main.rs` — controller (HID transport, pacing, lock, debug log)
-- repo root doubles as the plugin folder: `manifest.json`, `BarWidget.qml`,
-  `Panel.qml` (Quickshell/QML bar widget + panel)
-- `install.sh`, `scripts/`, `udev/` — installer and one-shot device rule
-- `docs/FINAL-ANALYSIS.md` — what the captures + REA concluded
-- `docs/captures/` — real usbmon pcapng + REA evidence exports
-- `docs/custom-color-investigation.md` — why custom RGB is unproven
-- `tests/` — offline release checks (no USB hardware required)
-- `reference/` (kept local, git-ignored) — original Windows artifacts for
-  future REA sessions; please don't republish Lenovo/SHINETEK binaries
+## Removal, with choices
 
-## Verify
+Open **Uninstall**, choose the items, select **Review selected removal…**,
+then **Confirm removal**.
 
-```bash
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build --release
-node tests/ui-state.cjs
-bash -n install.sh scripts/install-udev.sh
-```
+| Choice | Action |
+| --- | --- |
+| Plugin checkout (selected by default) | Starts detached `omarchy plugin remove borat.lecoo-rgb --yes` after the selected cleanup finishes. |
+| Controller under `~/.local` | Runs `cargo uninstall --root "$HOME/.local" omalecoo`; requires Cargo and the managed controller path. Custom configured binary paths are left for their original installation method. |
+| GK301 udev rule (optional) | Runs `pkexec <configured-controller> udev remove`; removes only the exact owned rule and reloads/triggers udev. |
+| Settings and diagnostic logs (optional) | Runs `<configured-controller> state clear` before removing the controller. Deletes `state.json`, `rules.json`, both Blackbox files and both debug logs. |
+
+State and device access are preserved unless selected. Cleanup stops on a
+failure before proceeding to later steps. State cleanup leaves `command.lock`,
+backups and unrelated files in the state directory. Removing saved settings
+does not reset the physical keyboard's lighting.
+
+## Follow the evidence
+
+- [Final protocol and readback conclusions](docs/FINAL-ANALYSIS.md)
+- [Physical user observations](docs/physical-validation.md)
+- [Extended brightness: recovered code, packets and observation](docs/captures/extended-brightness-experiment.md)
+- [USB captures and live analysis](docs/captures/live-analysis.md) · [final readback capture](docs/captures/final-readback-control.pcapng) · [direct ioctl observations](docs/captures/final-readback-probe.json)
+- [REA findings](docs/rea-findings.md) · [HID descriptors](docs/hid-descriptors.json)
+- [Why arbitrary color is unproven](docs/custom-color-investigation.md)
+- [Development checks and historical release notes](docs/verification.md)
+
+The project began with a Windows-only GK301 utility that would not run in my
+Omarchy setup. REA disassembly, exported UI definitions, USB captures and user
+observations supplied the pieces for a native controller. The evidence records
+explain which pieces held up and which controls were removed.
+
+`src/main.rs` owns HID, locking, persistence and diagnostics. `SignalService.qml`
+owns desktop events and arbitration; `BarWidget.qml` and `Panel.qml` provide the
+native UI. `manifest.json` registers the service and bar widget at the repo
+root. Original vendor binaries remain local, outside version control.
 
 ## License
 
