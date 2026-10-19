@@ -116,6 +116,18 @@ the Gaming effect, presets, auto cycle. Shortcuts: `n`/`p`
 next/previous effect, `o` off, `r` refresh, `Esc` close. Diagnostics
 (`doctor` output) appear inside the panel when you ask for them.
 
+## Remove
+
+```bash
+omarchy plugin remove borat.lecoo-rgb
+rm -f ~/.local/bin/lecoo-gk301
+# optional: drop the device access rule too
+sudo rm -f /etc/udev/rules.d/70-lecoo-gk301.rules
+```
+
+The panel state stays in `~/.local/state/lecoo-gk301/`; delete it if you
+want keyboard settings cleared as well.
+
 ## CLI
 
 ```bash
