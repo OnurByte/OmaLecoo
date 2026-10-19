@@ -1,8 +1,8 @@
 # OmaLecoo
 
 Lecoo GK301 keyboard RGB lighting for Omarchy — a native bar plugin + Rust
-CLI (SEMICO `1a2c:9df4`). 20 lighting effects, brightness, speed, presets,
-profiles, connection diagnostics — all through real HID Feature reports that
+CLI (SEMICO `1a2c:9df4`). 20 lighting effects, brightness (0–13), speed,
+presets, connection diagnostics — all through real HID Feature reports that
 I recovered by reverse engineering the official Windows tool.
 
 ## The story (why this exists)
@@ -44,7 +44,6 @@ physical observation. Firmware on the tested unit: **1.16**.
 | Brightness 0–13 (the Windows app only offered/clamped 0–5 — scale found via REA + live probes, user-confirmed visibly) | ✅ works |
 | Speed 0–2, gaming keys M1/M2 | ✅ works |
 | Presets (quiet / gaming / night / party / off / random) | ✅ works |
-| Named local profiles (save / load / delete) | ✅ works |
 | Auto effect rotation, reapply on demand | ✅ works |
 | Connection diagnostics + debug log | ✅ works |
 | Firmware response query (`response`) | ✅ works |
@@ -53,7 +52,7 @@ physical observation. Firmware on the tested unit: **1.16**.
 
 The side-LED and reset paths found in the Windows tool belong to a hidden
 Mouse page and never produced a visible change on this keyboard — so they are
-**not exposed**. GUI profiles and presets send exactly one main-panel packet.
+**not exposed**. GUI presets send exactly one main-panel packet.
 Arbitrary RGB colors were *not* recoverable from the tool: its lighting
 writer carries effect/brightness/speed/selection and no RGB triplet. I keep
 the honesty: whatever is not confirmed is not shipped.
@@ -93,7 +92,7 @@ omarchy plugin enable borat.lecoo-rgb --section right
 Bar icon: left click opens the panel, right click = next effect, scroll =
 brightness. In the panel: search, effect grid, brightness slider (0–13,
 finer than the original Windows app), speed (Slow/Medium/Fast), M1/M2 for
-the Gaming effect, presets, auto cycle, profile save/load. Shortcuts: `n`/`p`
+the Gaming effect, presets, auto cycle. Shortcuts: `n`/`p`
 next/previous effect, `o` off, `r` refresh, `Esc` close. Diagnostics
 (`doctor` output) appear inside the panel when you ask for them.
 
@@ -105,7 +104,6 @@ lecoo-gk301 response --json     # validated firmware response with timing
 lecoo-gk301 status --json       # last applied settings
 lecoo-gk301 panel 2 --brightness 5 --speed 1 --select 0
 lecoo-gk301 preset night
-lecoo-gk301 profile-save Evening && lecoo-gk301 profile-load Evening
 lecoo-gk301 capabilities --json # truthful capability report
 ```
 
@@ -115,7 +113,7 @@ the protocol work.
 
 ## Project layout
 
-- `src/main.rs` — controller (HID transport, pacing, lock, profiles, debug log)
+- `src/main.rs` — controller (HID transport, pacing, lock, debug log)
 - `plugin/` — Quickshell/QML plugin (bar widget + panel)
 - `install.sh`, `scripts/`, `udev/` — installer and one-shot device rule
 - `docs/FINAL-ANALYSIS.md` — what the captures + REA concluded
@@ -132,8 +130,6 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 cargo build --release
 node tests/ui-state.cjs
-python3 tests/integration.py
-python3 tests/panel-only.py
 bash -n install.sh scripts/install-udev.sh
 ```
 

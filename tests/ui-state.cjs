@@ -23,10 +23,10 @@ function panel() {
 }
 {
   const {root,context} = panel();
-  root.enqueue(['profile-load','gaming']);
+  root.enqueue(['preset','night']);
   assert.equal(context.worker.command.at(-1),'--panel-only');
   root.setEffect(13);
-  assert.equal(root.effect,2,'profile transition must block stale effect edits');
+  assert.equal(root.effect,2,'busy command must block stale effect edits');
   assert.equal(root.queue.length,0);
   root.busy=false;
   root.parseStatus(JSON.stringify({effect:19,brightness:0}),root.stateGeneration-1);
@@ -42,4 +42,4 @@ for (const command of [['preset','night'],['restore']]) {
   const {root,context}=panel();root.enqueue(command);
   assert.equal(context.worker.command.at(-1),'--panel-only');
 }
-console.log('UI profile synchronization, stale-response handling and panel-only routing passed.');
+console.log('UI stale-response handling and panel-only routing passed.');

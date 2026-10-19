@@ -17,6 +17,7 @@ install -m755 target/release/lecoo-gk301 "$binary_tmp"
 mv -f -- "$binary_tmp" "$HOME/.local/bin/lecoo-gk301"
 install -m644 plugin/* "$plugin_path/"
 # Retired decorative component; the backup above retains its previous copy.
+rm -f -- "$plugin_path/ProfileControls.qml"
 rm -f -- "$plugin_path/StudioCard.qml"
 echo "Installed. Source directory: $PWD"
 "$HOME/.local/bin/lecoo-gk301" doctor

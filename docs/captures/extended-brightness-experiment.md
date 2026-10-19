@@ -39,8 +39,10 @@ New this round, in addition to the earlier records:
 
 ## Hardware experiment (same attached keyboard, firmware 1.16)
 
-`scripts/probe-extended-brightness.py` (uses `command.lock`, same as the
-controller) on `/dev/hidraw5`, uaccess only, no root:
+The sweep ran through the probe diagnostic (a one-off Python script at the
+time; ported in v1.4.0 to the hidden `lecoo-gk301 probe-brightness`
+subcommand) with the same lock discipline as the controller, on
+`/dev/hidraw5`, uaccess only, no root:
 
 | t (monotonic) | direction | report |
 |---|---|---|

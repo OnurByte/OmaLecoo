@@ -1,7 +1,7 @@
 //! Lecoo GK301 (SEMICO 1a2c:9df4) keyboard RGB control.
 //!
 //! Protocol (vendor HID interface 1, report ID 7, 8-byte Feature reports):
-//!   panel effect : 07 FF FF <effect 0-19> <brightness 0-5> <speed 0-2> <select 0-2> 00
+//!   panel effect : 07 FF FF <effect 0-19> <brightness 0-13> <speed 0-2> <select 0-2> 00
 //!   firmware     : 07 F1 00 00 00 00 00 00 (set, then get)
 //!
 //! Side-lighting, raw and reset paths were removed from this tool: the
@@ -12,7 +12,7 @@
 use std::env;
 use std::ffi::{c_int, c_ulong};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -23,6 +23,8 @@ const REPORT_ID: u8 = 0x07;
 const VID: u32 = 0x1a2c;
 const PID: u32 = 0x9df4;
 const PANEL_EFFECTS: usize = 20;
+
+const O_NONBLOCK: i32 = 0o4000;
 
 const EFFECT_NAMES: [&str; PANEL_EFFECTS] = [
     "Steady",
@@ -135,61 +137,6 @@ impl State {
         st
     }
 
-    fn load_from(path: &std::path::Path) -> Result<Self, String> {
-        let text = fs::read_to_string(path).map_err(|e| format!("could not read profile: {e}"))?;
-        let body = text
-            .trim()
-            .strip_prefix('{')
-            .and_then(|t| t.strip_suffix('}'))
-            .ok_or("invalid profile JSON")?;
-        let mut fields = std::collections::HashMap::new();
-        for entry in body.split(',') {
-            let (key, value) = entry.split_once(':').ok_or("invalid profile field")?;
-            let key = key
-                .trim()
-                .strip_prefix('"')
-                .and_then(|s| s.strip_suffix('"'))
-                .filter(|s| !s.contains('"'))
-                .ok_or("invalid profile field name")?;
-            let value = value.trim();
-            if value.is_empty() || fields.insert(key, value).is_some() {
-                return Err("missing or duplicate profile field".into());
-            }
-            if matches!(key, "name" | "side_name") {
-                let label = value
-                    .strip_prefix('"')
-                    .and_then(|s| s.strip_suffix('"'))
-                    .ok_or("invalid profile label")?;
-                if label.contains(['"', '\\']) || label.chars().any(char::is_control) {
-                    return Err("invalid profile label".into());
-                }
-            } else if !value.bytes().all(|b| b.is_ascii_digit()) {
-                return Err("profile values must be nonnegative integers".into());
-            }
-        }
-        let number = |key: &str, max: u64| -> Result<u64, String> {
-            let value = fields
-                .get(key)
-                .ok_or_else(|| format!("missing profile field: {key}"))?
-                .parse::<u64>()
-                .map_err(|_| format!("invalid profile value: {key}"))?;
-            if value > max {
-                return Err(format!("profile value out of range: {key}"));
-            }
-            Ok(value)
-        };
-        // Older 1.0 profiles also stored side_light fields; those writers were
-        // removed, but reading them keeps existing profiles loadable.
-        let st = Self {
-            effect: number("effect", (PANEL_EFFECTS - 1) as u64)? as usize,
-            brightness: number("brightness", 5)? as u8,
-            speed: number("speed", 2)? as u8,
-            select: number("select", 2)? as u8,
-        };
-        st.validate()?;
-        Ok(st)
-    }
-
     fn save(&self) -> Result<(), String> {
         self.save_to(&Self::path())
             .map_err(|e| format!("device command sent but state could not be saved: {}", e))
@@ -235,48 +182,6 @@ impl State {
         }
         Ok(())
     }
-}
-
-fn profiles_dir() -> PathBuf {
-    State::path().with_file_name("profiles")
-}
-
-fn profile_path(root: &std::path::Path, name: &str) -> Result<PathBuf, String> {
-    if name.is_empty()
-        || name.len() > 48
-        || !name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-    {
-        return Err("profile name must contain 1..48 ASCII letters, digits, - or _".into());
-    }
-    Ok(root.join(format!("{name}.json")))
-}
-
-fn profile_names(root: &std::path::Path) -> Result<Vec<String>, String> {
-    let entries = match fs::read_dir(root) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(format!("could not read profiles: {e}")),
-    };
-    let mut names = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
-            continue;
-        }
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("json") {
-            continue;
-        }
-        if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-            if profile_path(root, name).is_ok() {
-                names.push(name.to_string());
-            }
-        }
-    }
-    names.sort();
-    Ok(names)
 }
 
 fn find_u64(text: &str, key: &str) -> Option<u64> {
@@ -597,7 +502,7 @@ fn catalog_json() -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!(
-        "{{\"panel\":[{}],\"panel_brightness_max\":5,\"speed_max\":2,\"select_max\":2}}",
+        "{{\"panel\":[{}],\"panel_brightness_max\":13,\"speed_max\":2,\"select_max\":2}}",
         panel
     )
 }
@@ -675,10 +580,6 @@ fn usage() {
 \n\
 Usage:\n\
   lecoo-gk301 capabilities [--json]        show verified capabilities\n\
-  lecoo-gk301 profiles [--json]            list saved profiles\n\
-  lecoo-gk301 profile-save <name>          save lighting settings\n\
-  lecoo-gk301 profile-load <name>          apply saved lighting settings\n\
-  lecoo-gk301 profile-delete <name>        delete a saved profile\n\
   lecoo-gk301 doctor                       connection and debug information\n\
   lecoo-gk301 response [--json]            validated firmware return path\n\
   lecoo-gk301 restore                      apply last lighting settings\n\
@@ -726,57 +627,12 @@ fn run() -> Result<(), String> {
             | "--help"
             | "dev"
             | "capabilities"
-            | "profiles"
-            | "profile-save"
-            | "profile-delete"
+            | "probe-brightness"
     ) {
         thread::sleep(Duration::from_millis(110));
     }
     match cmd {
         "capabilities" => println!("{}", capabilities_json()),
-        "profiles" => {
-            let names = profile_names(&profiles_dir())?;
-            if has_flag(&args, "--json") {
-                println!(
-                    "[{}]",
-                    names
-                        .iter()
-                        .map(|n| format!("\"{n}\""))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                );
-            } else {
-                for name in names {
-                    println!("{name}");
-                }
-            }
-        }
-        "profile-save" | "profile-load" | "profile-delete" => {
-            let name = args
-                .get(1)
-                .ok_or("usage: profile-save|profile-load|profile-delete <name>")?;
-            let path = profile_path(&profiles_dir(), name)?;
-            match cmd {
-                "profile-save" => {
-                    let st = State::load();
-                    st.validate()?;
-                    st.save_to(&path)
-                        .map_err(|e| format!("could not save profile: {e}"))?;
-                    println!("Profile saved: {name}");
-                }
-                "profile-load" => {
-                    let st = State::load_from(&path)?;
-                    let dev = Device::open_detected(device_arg)?;
-                    send_panel(&dev, &st)?;
-                    st.save()?;
-                    println!("Profile applied: {name}");
-                }
-                _ => {
-                    fs::remove_file(&path).map_err(|e| format!("could not delete profile: {e}"))?;
-                    println!("Profile deleted: {name}");
-                }
-            }
-        }
         "doctor" => {
             let dev = Device::open_detected(device_arg)?;
             println!("device: {}", dev.path.display());
@@ -841,7 +697,7 @@ fn run() -> Result<(), String> {
                 println!("{}", st.json());
             } else {
                 println!("effect    : {} ({})", st.effect, st.name());
-                println!("brightness: {}/5", st.brightness);
+                println!("brightness: {}/13", st.brightness);
                 println!("speed     : {}/2", st.speed);
                 println!("selection : {}/2", st.select);
                 println!("(settings are the last values sent from this computer)");
@@ -858,7 +714,7 @@ fn run() -> Result<(), String> {
             send_panel(&dev, &st)?;
             st.save()?;
             println!(
-                "panel: {} ({}) brightness {}/5 speed {}/2",
+                "panel: {} ({}) brightness {}/13 speed {}/2",
                 st.effect,
                 st.name(),
                 st.brightness,
@@ -918,7 +774,7 @@ fn run() -> Result<(), String> {
             send_panel(&dev, &st)?;
             st.save()?;
             println!(
-                "preset: {} · panel {} ({}) {}/5 speed {}/2",
+                "preset: {} · panel {} ({}) {}/13 speed {}/2",
                 name,
                 st.effect,
                 st.name(),
@@ -962,6 +818,7 @@ fn run() -> Result<(), String> {
             println!("{}", hex(&resp));
             println!("(this readback carries firmware data, not lighting state)");
         }
+        "probe-brightness" => probe_brightness(&args, device_arg)?,
         other => {
             return Err(format!("unknown command: {}\n\nlecoo-gk301 --help", other));
         }
@@ -1022,6 +879,226 @@ fn main() -> ExitCode {
     }
 }
 
+/// Hidden research diagnostic (not listed in usage): replays the Windows
+/// tool's startup-form sweep — the stored-record write with an unclamped
+/// brightness byte — on the live keyboard, and records any vendor input
+/// reports from a concurrent non-blocking reader. Results are written to
+/// a JSON file; see docs/captures/extended-brightness-experiment.md.
+fn probe_brightness(args: &[String], device_arg: Option<&str>) -> Result<(), String> {
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    let flag = |name: &str, fallback: &str| -> String {
+        if let Some(i) = args.iter().position(|a| a == name) {
+            args.get(i + 1)
+                .cloned()
+                .unwrap_or_else(|| fallback.to_string())
+        } else {
+            fallback.to_string()
+        }
+    };
+    let out_path = if let Some(i) = args.iter().position(|a| a == "--out") {
+        PathBuf::from(args.get(i + 1).ok_or("missing value for --out")?)
+    } else {
+        return Err("probe-brightness requires --out <path>".into());
+    };
+    let wait_first: f64 = flag("--wait-first", "0")
+        .parse()
+        .map_err(|_| "--wait-first must be a number of seconds".to_string())?;
+    let sweep = {
+        let mut list = Vec::new();
+        for part in flag("--brightnesses", "8,10,13").split(',') {
+            if part.trim().is_empty() {
+                continue;
+            }
+            let v: u8 = part
+                .trim()
+                .parse()
+                .map_err(|_| format!("invalid brightness value: {part}"))?;
+            if v > 13 {
+                return Err("probe brightness must be in 0..13".into());
+            }
+            list.push(v);
+        }
+        if list.is_empty() {
+            return Err("--brightnesses needs at least one value".into());
+        }
+        list
+    };
+
+    let device = Device::open_detected(device_arg)?;
+    let mut read_opts = OpenOptions::new();
+    read_opts.read(true).custom_flags(O_NONBLOCK);
+    let mut reader_fd = read_opts
+        .open(&device.path)
+        .map_err(|e| format!("could not open read handle: {e}"))?;
+    let t0 = std::time::Instant::now();
+    let events: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let record = |events: &Arc<Mutex<Vec<String>>>, kind: &str, extra: &str| {
+        let line = format!(
+            "{{\"t\":{:.3},\"kind\":\"{}\"{}}}",
+            t0.elapsed().as_secs_f64(),
+            kind,
+            extra
+        );
+        println!("{line}");
+        let mut stored = events.lock().unwrap_or_else(|p| p.into_inner());
+        stored.push(line);
+    };
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let reader_stop = Arc::clone(&stop);
+    let reader_events = Arc::clone(&events);
+    let reader = thread::spawn(move || {
+        let log = |kind: &str, extra: &str| -> String {
+            let line = format!(
+                "{{\"t\":{:.3},\"kind\":\"{}\"{}}}",
+                t0.elapsed().as_secs_f64(),
+                kind,
+                extra
+            );
+            println!("{line}");
+            line
+        };
+        let mut seen: Vec<String> = Vec::new();
+        let mut buf = [0u8; 64];
+        loop {
+            if reader_stop.load(Ordering::Relaxed) {
+                break;
+            }
+            match reader_fd.read(&mut buf) {
+                Ok(0) => {}
+                Ok(n) => {
+                    let raw = hex(&buf[..n]);
+                    if !seen.contains(&raw) {
+                        seen.push(raw.clone());
+                        let line = log(
+                            "input_report",
+                            &format!(",\"report_id\":{},\"raw\":\"{}\"", buf[0], raw),
+                        );
+                        reader_events
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .push(line);
+                    }
+                }
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    let line = log(
+                        "reader_error",
+                        &format!(",\"error\":\"{}\"", e.to_string().replace('"', "\\\"")),
+                    );
+                    reader_events
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .push(line);
+                    break;
+                }
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    });
+
+    if wait_first > 0.0 {
+        let until = t0 + Duration::from_secs_f64(wait_first);
+        while std::time::Instant::now() < until {
+            thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    record(
+        &events,
+        "start",
+        &format!(",\"device\":\"{}\"", device.path.display()),
+    );
+
+    let mut step_error: Option<String> = None;
+    // 1) Firmware acknowledgment (known-good sanity path).
+    match query_firmware(&device) {
+        Ok(resp) => record(
+            &events,
+            "firmware_response",
+            &format!(",\"raw\":\"{}\",\"firmware\":\"{}\"", hex(&resp.raw), resp.firmware),
+        ),
+        Err(e) => step_error = Some(format!("firmware query failed: {e}")),
+    }
+    if step_error.is_none() {
+        thread::sleep(Duration::from_secs(1));
+        // 2) Baseline: the clamped panel write, Steady at 5.
+        let payload: [u8; 8] = [REPORT_ID, 0xFF, 0xFF, 0x00, 0x05, 0x02, 0x00, 0x00];
+        record(&events, "set_feature", &format!(",\"raw\":\"{}\"", hex(&payload)));
+        match device.set_feature([0xFF, 0xFF, 0x00, 0x05, 0x02, 0x00, 0x00]) {
+            Ok(()) => record(
+                &events,
+                "set_feature_done",
+                &format!(",\"raw\":\"{}\"", hex(&payload)),
+            ),
+            Err(e) => {
+                step_error = Some(format!(
+                    "baseline write failed: {} ({})",
+                    e,
+                    permission_hint(&e)
+                ))
+            }
+        }
+    }
+    // 3) Startup-form writes: stored-record path (unclamped brightness byte).
+    if step_error.is_none() {
+        thread::sleep(Duration::from_millis(1200));
+        for b in sweep {
+            let payload: [u8; 8] = [REPORT_ID, 0xFF, 0xFF, 0x00, b, 0x00, 0x00, 0x00];
+            record(&events, "set_feature", &format!(",\"raw\":\"{}\"", hex(&payload)));
+            match device.set_feature([0xFF, 0xFF, 0x00, b, 0x00, 0x00, 0x00]) {
+                Ok(()) => record(
+                    &events,
+                    "set_feature_done",
+                    &format!(",\"raw\":\"{}\"", hex(&payload)),
+                ),
+                Err(e) => {
+                    step_error = Some(format!(
+                        "brightness {b} write failed: {} ({})",
+                        e,
+                        permission_hint(&e)
+                    ));
+                    break;
+                }
+            }
+            thread::sleep(Duration::from_millis(1200));
+        }
+    }
+    // 4) Restore the user's own last settings through the normal writer.
+    if step_error.is_none() {
+        let st = State::load();
+        record(
+            &events,
+            "restored",
+            &format!(",\"state\":\"{}\"", st.json().replace('"', "\\\"")),
+        );
+        if let Err(e) = send_panel(&device, &st) {
+            step_error = Some(format!("restore write failed: {e}"));
+        }
+    }
+
+    thread::sleep(Duration::from_millis(500));
+    stop.store(true, Ordering::Relaxed);
+    let _ = reader.join();
+    if let Some(err) = step_error {
+        return Err(err);
+    }
+    let stored = events.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    let report = format!(
+        "{{\n  \"device\": \"{}\",\n  \"events\": [\n    {}\n  ]\n}}\n",
+        device.path.display(),
+        stored.join(",\n    ")
+    );
+    fs::write(&out_path, report)
+        .map_err(|e| format!("could not write {}: {e}", out_path.display()))?;
+    println!("saved {} events -> {}", stored.len(), out_path.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1041,53 +1118,6 @@ mod tests {
         assert!(firmware_string(&[0x09, 0x01, 0x16, 0, 0, 0, 0, 0]).is_err());
         assert!(firmware_string(&[0x07, 0x00, 0x00, 0, 0, 0, 0, 0]).is_err());
         assert!(firmware_string(&[0x07, 0x01, 0xFA, 0, 0, 0, 0, 0]).is_err());
-    }
-
-    #[test]
-    fn profile_names_cannot_escape_directory() {
-        for name in [
-            "",
-            "../state",
-            "/tmp/p",
-            "a/b",
-            "a.b",
-            "ışık",
-            &"a".repeat(49),
-        ] {
-            assert!(profile_path(std::path::Path::new("/tmp/profiles"), name).is_err());
-        }
-        assert!(profile_path(std::path::Path::new("/tmp/profiles"), "Game_1-blue").is_ok());
-    }
-
-    #[test]
-    fn profile_roundtrip_and_corruption_rejection() {
-        let root = env::temp_dir().join(format!(
-            "lecoo-profiles-{}-{}",
-            std::process::id(),
-            random_seed()
-        ));
-        let path = profile_path(&root, "gaming").unwrap();
-        let st = State {
-            effect: 13,
-            brightness: 3,
-            speed: 1,
-            select: 2,
-        };
-        st.save_to(&path).unwrap();
-        assert_eq!(State::load_from(&path).unwrap().json(), st.json());
-        for text in [
-            "{}",
-            "garbage",
-            "{\"effect\":0}",
-            &st.json().replace("\"speed\":1", "\"speed\":256"),
-            &st.json().replace("\"speed\":1", "\"speed\":1.5"),
-            &st.json().replace("\"speed\":1", "\"speed\":-1"),
-            &st.json().replace("\"speed\":1", "\"speed\":1,\"speed\":2"),
-        ] {
-            fs::write(&path, text).unwrap();
-            assert!(State::load_from(&path).is_err(), "accepted {text}");
-        }
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -1,16 +1,32 @@
-# Release verification — 1.3.0
+# Release verification — 1.4.0
 
 Run from the project directory:
 
 ```bash
-cargo test
+cargo test                       # unit + offline CLI + intercepted-transport tests
 cargo clippy --all-targets -- -D warnings
 cargo build --release
 node tests/ui-state.cjs
-python3 tests/integration.py
-python3 tests/panel-only.py
 bash -n install.sh scripts/install-udev.sh
 ```
+
+## What changed in 1.4.0 (profiles removed; Rust-only tooling)
+
+- **Profile feature removed entirely** (maintainer request): the CLI lost
+  `profiles`, `profile-save`, `profile-load` and `profile-delete`; the panel
+  lost its lighting-profiles section (`plugin/ProfileControls.qml` deleted,
+  stale installs are cleaned by `install.sh`); no profile JSON is read or
+  written anymore. `state.json` keeps the last applied settings only.
+- **No Python in the project.** `tests/integration.py` and
+  `tests/panel-only.py` were ported to Rust (`tests/integration.rs` and
+  `tests/transport.rs`, keeping the C interception shim
+  `tests/ioctl_capture.c`); `scripts/probe-extended-brightness.py` became the
+  hidden `lecoo-gk301 probe-brightness` diagnostic. `--panel-only` flag and
+  the interception/checks semantics are unchanged.
+- Stale brightness prints fixed to `/13` (status, next/prev, preset), and
+  `catalog --json` now reports `panel_brightness_max` 13.
+
+## Historical — 1.3.0 (extended brightness)
 
 ## What changed in 1.3.0 (extended brightness)
 
@@ -22,8 +38,6 @@ bash -n install.sh scripts/install-udev.sh
   (`panel_brightness_max` 13, `panel_brightness_max_windows` 5).
 - `brightness <0-13>` and `panel --brightness` updated; old saved states and
   profiles remain valid.
-
-## Historical — 1.2.0 (OmaLecoo)
 
 ## What changed in 1.2.0 (OmaLecoo)
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "borat.lecoo-rgb",
   "name": "OmaLecoo",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "borat",
   "description": "Lecoo GK301 keyboard RGB lighting controls for Omarchy",
   "kinds": [
@@ -13,7 +13,7 @@
   },
   "barWidget": {
     "displayName": "OmaLecoo",
-    "description": "Lecoo GK301 lighting effects, brightness, saved profiles and diagnostics",
+    "description": "Lecoo GK301 lighting effects, brightness and diagnostics",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right",

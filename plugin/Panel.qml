@@ -39,7 +39,6 @@ Panel {
   property string debugText: ""
 
   property var panelNames: []
-  property var profiles: []
 
   // Extras the Windows app does not have.
   property bool autoCycle: false
@@ -64,7 +63,6 @@ Panel {
     }
   }
   function refreshCatalog() { if (!catalogProc.running) catalogProc.running = true }
-  function refreshProfiles() { if (!profilesProc.running) profilesProc.running = true }
   function refreshInfo() {
     if (!root.busy && root.queue.length === 0 && !infoProc.running) {
       infoProc.err = ""
@@ -115,9 +113,9 @@ Panel {
   function enqueue(args) {
     if (root.stateSyncPending) return
     // GK301's confirmed path is the keyboard panel, not the shared Mouse page.
-    if (["profile-load", "preset", "restore"].indexOf(args[0]) !== -1)
+    if (["preset", "restore"].indexOf(args[0]) !== -1)
       args = args.concat(["--panel-only"])
-    if (["profile-load", "preset", "reset", "restore"].indexOf(args[0]) !== -1)
+    if (["preset", "reset", "restore"].indexOf(args[0]) !== -1)
       root.stateSyncPending = true
     root.stateGeneration += 1
     root.queue = root.queue.concat([args])
@@ -200,13 +198,11 @@ Panel {
 
   Component.onCompleted: {
     root.refreshCatalog()
-    root.refreshProfiles()
     root.refresh()
     root.refreshInfo()
   }
 
   function open() {
-    root.refreshProfiles()
     root.refresh()
     root.refreshInfo()
     if (scroller.contentItem) scroller.contentItem.contentY = 0
@@ -271,7 +267,7 @@ Panel {
         }
         root.busy = false
         root.runNext()
-        if (!root.busy) { root.refresh(); root.refreshProfiles() }
+        if (!root.busy) root.refresh()
       })
     }
   }
@@ -334,20 +330,6 @@ Panel {
     }
   }
 
-  Process {
-    id: profilesProc
-    command: [root.binary, "profiles", "--json"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        try {
-          var names = JSON.parse(String(text || "[]"))
-          if (Array.isArray(names)) root.profiles = names
-        } catch (e) { root.lastError = "Could not read the profile list" }
-      }
-    }
-  }
-
   // ---- the panel itself ----
 
   KeyboardPanel {
@@ -363,7 +345,7 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: studioCard.editing || effectSearch.activeFocus
+      blocked: effectSearch.activeFocus
       onTabRequested: function(direction) {
         var item = keyCatcher.nextItemInFocusChain(direction > 0)
         if (item) item.forceActiveFocus(Qt.TabFocusReason)
@@ -377,7 +359,7 @@ Panel {
         if (dy !== 0) scroller.contentItem.contentY += dy * Style.space(48)
       }
       onTextKey: function(t) {
-        if (studioCard.editing || effectSearch.activeFocus) return
+        if (effectSearch.activeFocus) return
         if (t === "n") root.nextEffect()
         else if (t === "p") root.prevEffect()
         else if (t === "o") root.applyPreset("off")
@@ -474,12 +456,6 @@ Panel {
           }
 
           PanelSeparator { foreground: Color.foreground }
-
-          ProfileControls {
-            id: studioCard
-            width: parent.width
-            controller: root
-          }
 
           // ---------- panel effects ----------
           Row {
