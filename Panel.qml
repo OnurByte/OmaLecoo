@@ -975,8 +975,9 @@ Panel {
             }
           }
 
-          // ---------- game group (M1 / M2) ----------
-          // Like the speed row, this one keeps its place for every effect.
+          // ---------- loader (M1 / M2 / M3) ----------
+          // The loader is the original tool's own control for the keyboard's
+          // M1/M2/M3 key group. It rides in the same report as the effect.
           Row {
             width: parent.width
             spacing: Style.space(8)
@@ -986,7 +987,7 @@ Panel {
             Text {
               width: Style.space(88)
               height: Style.space(28)
-              text: "Game keys"
+              text: "M1 / M2 / M3"
               color: Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
@@ -996,7 +997,8 @@ Panel {
             ButtonGroup {
               options: [
                 { value: "0", label: "M1" },
-                { value: "1", label: "M2" }
+                { value: "1", label: "M2" },
+                { value: "2", label: "M3" }
               ]
               value: String(root.select)
               foreground: Color.foreground
@@ -1004,6 +1006,11 @@ Panel {
               accent: Color.accent
               onChanged: function(v) { root.setSelect(Number(v)) }
             }
+          }
+
+          Note {
+            width: parent.width
+            text: "M1, M2 and M3 are the original tool's loader values. The keyboard's own FN+1 … FN+9 keys pick which key group glows (FN+1 lights ESC, WASD and the arrow keys); that choice lives in the keyboard, and the recovered protocol has no field for it. The Game preset re-applies the Gaming Special Key effect, so the keyboard lights whichever group FN+N last selected."
           }
 
           // ---------- presets ----------
@@ -1044,6 +1051,11 @@ Panel {
           }
 
           // ---------- auto rotation ----------
+          Note {
+            width: parent.width
+            text: "Game applies the keyboard's Gaming Special Key effect: it lights the key group the keyboard's own FN+1 … FN+9 key last chose."
+          }
+
           Row {
             width: parent.width
             spacing: Style.space(8)

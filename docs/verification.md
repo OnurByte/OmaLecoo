@@ -4,6 +4,31 @@ Version `1.5.0` identifies the Signal Engine development line in the Cargo
 package and plugin manifest. This document records implementation checks and
 historical release notes; it does not announce publication of v1.5.0.
 
+## The FN lighting zones and the loader byte — 20 October 2026
+
+The keyboard lights a different key group for each of its own FN+1 … FN+9
+keys. A live usbmon capture (control transfers only, raw file deleted right
+after filtering) and a REA pass over the original Windows tool settled what
+the host can and cannot set. The record and the reasoning are in
+[docs/captures/lighting-zone-capture.md](captures/lighting-zone-capture.md).
+
+- The report that reaches the device is `07 FF | effect | brightness | speed
+  | loader | 00` as a Feature report, ID 7, interface 1 — confirmed on the
+  wire, not only by the ioctl return value.
+- REA confirms the loader mapping: the stored values 1, 2 and 3 become the
+  wire bytes 0, 1 and 2, and the stored direction byte is never transmitted.
+- The **loader is not the FN zone**. Changing the loader does not move the lit
+  key group; a loader value above 2 makes the keyboard blink and fall back.
+- The **FN zone lives in the keyboard**: after the user pressed FN+2, the
+  plugin's `Gaming Special Key` effect lit the FN+2 group (TAB, SHIFT, CTRL,
+  QWER, HOME, PRTSC, SCRLK, PGUP, END, PGDN). The host can enter the
+  special-key lighting but cannot choose the group.
+
+The plugin therefore keeps the loader at M1/M2/M3, exactly the three values
+the original tool exposed, and the `game` preset and the fullscreen rule
+apply `Gaming Special Key` so they light whichever group the keyboard is
+in.
+
 ## Panel fixes and the missing features — 20 October 2026
 
 **The bar and panel shifting.** The panel scrolled its content with a fixed

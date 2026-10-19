@@ -18,6 +18,12 @@ pub const WINDOWS_BRIGHTNESS_MAX: u8 = 5;
 /// Highest speed the recovered mapping accepts.
 pub const SPEED_MAX: u8 = 2;
 /// Highest gaming-key selection the recovered mapping accepts.
+///
+/// The Windows tool exposed three (M1, M2, M3) and its writer maps the
+/// stored values 1, 2 and 3 onto the wire bytes 0, 1 and 2. The keyboard
+/// has nine lighting zones of its own (FN+1 … FN+9), but it blinks and falls
+/// back when it is sent a larger value, so the wire byte carries exactly
+/// these three.
 pub const SELECT_MAX: u8 = 2;
 
 /// The recovered main-panel effect names, in hardware order.
