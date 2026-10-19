@@ -5,6 +5,44 @@ CLI (SEMICO `1a2c:9df4`). 20 lighting effects, brightness (0–13), speed,
 presets, connection diagnostics — all through real HID Feature reports that
 I recovered by reverse engineering the official Windows tool.
 
+## Install
+
+```bash
+omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
+```
+
+That installs and enables the bar plugin (the repo root is the plugin
+folder: `manifest.json`, `BarWidget.qml`, `Panel.qml` — the layout the
+[marketplace guide](https://plugins.omarchy.org/develop.html) documents).
+The keyboard controller binary is separate; pick one way to provide it:
+
+```bash
+# from source (needs Rust/cargo)
+cargo install --git https://github.com/OnurByte/OmaLecoo
+```
+
+```bash
+# or the prebuilt binary from a GitHub release
+mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/lecoo-gk301 \
+  https://github.com/OnurByte/OmaLecoo/releases/latest/download/lecoo-gk301
+chmod +x ~/.local/bin/lecoo-gk301
+```
+
+If the binary lives somewhere else on `PATH`, set it in the plugin's bar
+settings (`binary` property). Either way, grant the HID node user access —
+one sudo pass, once:
+
+```bash
+sudo bash scripts/install-udev.sh   # from inside the plugin directory
+```
+
+Installing from a plain checkout instead: run `./install.sh` from the repo;
+it builds the controller, installs the binary and plugin files and takes at
+most one sudo (the udev rule). Daily use never needs sudo: the rule tags the
+vendor HID node with `uaccess`. If the bar keeps an older copy, run
+`omarchy restart shell`.
+
 ## The story (why this exists)
 
 I use Omarchy. I love DHH's stuff — Ruby on Rails, the *just build the thing*
@@ -57,10 +95,10 @@ Arbitrary RGB colors were *not* recoverable from the tool: its lighting
 writer carries effect/brightness/speed/selection and no RGB triplet. I keep
 the honesty: whatever is not confirmed is not shipped.
 
-Protocol, for the curious (8-byte Feature reports, report ID 7, interface 1):
+Recovered protocol (8-byte Feature reports, report ID 7, interface 1):
 
 ```
-panel effect : 07 FF FF <effect 0-19> <brightness 0-5> <speed 0-2> <select 0-2> 00
+panel effect : 07 FF FF <effect 0-19> <brightness 0-13> <speed 0-2> <select 0-2> 00
 firmware     : 07 F1 00 00 00 00 00 00 (set, then get)
 ```
 
@@ -68,24 +106,6 @@ firmware     : 07 F1 00 00 00 00 00 00 (set, then get)
 validated reply (version, raw bytes, roundtrip time). One honest caveat: this
 firmware path reports its version but not the current lighting state, so the
 panel always shows the last settings sent from this computer.
-
-## Install
-
-Requirements: Linux with Omarchy/Quickshell and a Rust toolchain (`cargo`).
-
-```bash
-./install.sh
-omarchy plugin enable borat.lecoo-rgb --section right
-```
-
-- The installer builds the controller, backs up the current plugin and
-  installs it.
-- It asks for **sudo at most once** (when the device access rule is missing
-  or outdated). Daily use never needs sudo — the udev rule tags the vendor
-  HID node with `uaccess`.
-- Installed files live in `~/.local/bin/` and
-  `${XDG_CONFIG_HOME:-~/.config}/omarchy/plugins/`.
-- If the bar keeps an older copy, run `omarchy restart shell`.
 
 ## Controls
 
@@ -114,7 +134,8 @@ the protocol work.
 ## Project layout
 
 - `src/main.rs` — controller (HID transport, pacing, lock, debug log)
-- `plugin/` — Quickshell/QML plugin (bar widget + panel)
+- repo root doubles as the plugin folder: `manifest.json`, `BarWidget.qml`,
+  `Panel.qml` (Quickshell/QML bar widget + panel)
 - `install.sh`, `scripts/`, `udev/` — installer and one-shot device rule
 - `docs/FINAL-ANALYSIS.md` — what the captures + REA concluded
 - `docs/captures/` — real usbmon pcapng + REA evidence exports

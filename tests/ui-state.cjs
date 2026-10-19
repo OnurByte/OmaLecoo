@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync('plugin/Panel.qml', 'utf8');
+const source = fs.readFileSync('Panel.qml', 'utf8');
 function extract(name) {
   const start = source.indexOf('  function ' + name + '(');
   assert(start >= 0, name);
