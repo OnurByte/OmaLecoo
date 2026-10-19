@@ -2,14 +2,16 @@
   "schemaVersion": 1,
   "id": "borat.lecoo-rgb",
   "name": "OmaLecoo",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "author": "borat",
   "license": "MIT",
   "description": "Lecoo GK301 keyboard RGB lighting controls for Omarchy",
   "kinds": [
+    "service",
     "bar-widget"
   ],
   "entryPoints": {
+    "service": "SignalService.qml",
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {

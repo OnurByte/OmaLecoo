@@ -877,7 +877,10 @@ fn run() -> Result<(), String> {
             };
             let dev = Device::open_detected(device_arg)?;
             send_panel(&dev, &st, origin)?;
-            st.save()?;
+            // Automatic rules must preserve the user's manual restore point.
+            if origin != "signal" {
+                st.save()?;
+            }
             println!(
                 "panel: {} ({}) brightness {}/13 speed {}/2",
                 st.effect,
@@ -906,7 +909,9 @@ fn run() -> Result<(), String> {
             st.validate()?;
             let dev = Device::open_detected(device_arg)?;
             send_panel(&dev, &st, origin)?;
-            st.save()?;
+            if origin != "signal" {
+                st.save()?;
+            }
             println!(
                 "panel: {} ({}) brightness {}/13 speed {}/2 selection {}",
                 st.effect,
@@ -927,7 +932,9 @@ fn run() -> Result<(), String> {
             st.validate()?;
             let dev = Device::open_detected(device_arg)?;
             send_panel(&dev, &st, origin)?;
-            st.save()?;
+            if origin != "signal" {
+                st.save()?;
+            }
             println!("brightness: {}/13", st.brightness);
         }
         "preset" => {
@@ -937,7 +944,9 @@ fn run() -> Result<(), String> {
             let st = preset_state(name)?;
             let dev = Device::open_detected(device_arg)?;
             send_panel(&dev, &st, origin)?;
-            st.save()?;
+            if origin != "signal" {
+                st.save()?;
+            }
             println!(
                 "preset: {} · panel {} ({}) {}/13 speed {}/2",
                 name,

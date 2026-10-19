@@ -15,6 +15,8 @@ BarWidget {
   moduleName: "borat.lecoo-rgb"
 
   readonly property var panel: panelLoader.item
+  readonly property var signalService: bar && bar.shell && typeof bar.shell.serviceFor === "function"
+    ? bar.shell.serviceFor(root.moduleName) : null
 
   // ---- popup lifecycle, in the shape the bar's popout coordinator expects
   //      (open / close / opened on the widget root).
@@ -33,6 +35,8 @@ BarWidget {
     if ("settings" in target) target.settings = root.settings
     if ("anchorItem" in target) target.anchorItem = button
     if ("hostWidget" in target) target.hostWidget = root
+    if ("signalService" in target) target.signalService = root.signalService
+    if (root.signalService) root.signalService.binary = target.binary
   }
 
   implicitWidth: button.implicitWidth
@@ -40,6 +44,7 @@ BarWidget {
 
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
+  onSignalServiceChanged: injectPanel()
 
   // The panel owns the device logic; it stays loaded (but invisible) so the
   // bar's tooltip always has fresh state to show.
@@ -69,7 +74,8 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     text: "\uf11c"
-    active: root.panel ? (root.panel.firmware !== "" && root.panel.lit) : false
+    active: root.panel ? (root.panel.deviceConnected && root.panel.lit) : false
+    opacity: root.panel && !root.panel.deviceConnected ? 0.5 : 1
     activeColor: Color.accent
     tooltipText: root.panel ? root.panel.tooltipText() : "OmaLecoo · Lecoo GK301"
     onPressed: function(b) {

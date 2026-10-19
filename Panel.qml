@@ -22,10 +22,32 @@ Panel {
   // Injected by the host bar widget.
   property var anchorItem: null
   property var hostWidget: null
+  property var signalService: null
   readonly property var barIdentity: hostWidget || root
 
   readonly property string homePath: Quickshell.env("HOME")
   readonly property string binary: setting("binary", "") || (homePath + "/.local/bin/lecoo-gk301")
+  readonly property string localBinary: homePath + "/.local/bin/lecoo-gk301"
+  readonly property bool deviceConnected: signalService ? signalService.connected : fallbackConnected
+  readonly property bool deviceWritable: signalService ? signalService.writable : fallbackWritable
+  property bool fallbackConnected: false
+  property bool fallbackWritable: false
+  property double lastWriteFinished: 0
+  property int requestSerial: 0
+  property string activeRequest: ""
+  property var blackboxEntries: []
+  property string blackboxError: ""
+  property string page: "lighting"
+  property bool cargoAvailable: false
+  property bool setupBusy: false
+  property string setupMessage: ""
+  property string lifecycleAction: ""
+  property var lifecycleQueue: []
+  property bool removeController: false
+  property bool removePlugin: true
+  property bool removeUdev: false
+  property bool removeState: false
+  property bool removalConfirmed: false
 
   // ---- last state reported by the Rust cache ----
   property int effect: 0
@@ -33,7 +55,6 @@ Panel {
   property int speed: 2
   property int select: 0
   property string panelName: ""
-  property string firmware: ""
   property string lastError: ""
   property string connectionError: ""
   property string debugText: ""
@@ -64,11 +85,10 @@ Panel {
   }
   function refreshCatalog() { if (!catalogProc.running) catalogProc.running = true }
   function refreshInfo() {
-    if (!root.busy && root.queue.length === 0 && !infoProc.running) {
-      infoProc.err = ""
-      infoProc.running = true
-    }
+    if (signalService) signalService.checkPresence()
+    else if (!presenceProc.running) { presenceProc.output = ""; presenceProc.running = true }
   }
+  function refreshBlackbox() { if (!blackboxProc.running && !setupBusy) blackboxProc.running = true }
 
   function parseStatus(raw, generation) {
     if (root.busy || root.queue.length > 0 || (generation !== undefined && generation !== root.stateGeneration)) return
@@ -103,18 +123,16 @@ Panel {
   function tooltipText() {
     var name = root.effectLabel(root.effect)
     return "OmaLecoo · " + name + " · brightness " + root.brightness + "/13"
-      + (root.firmware !== "" ? " · fw " + root.firmware : "")
       + (root.autoCycle ? " · auto" : "")
-      + (root.connectionError !== "" ? " · disconnected" : "")
+      + (!root.deviceConnected ? " · Ghost Mode · cached" : !root.deviceWritable ? " · permission denied" : " · cached")
+      + (root.signalService ? " · " + root.signalService.activeRule : "")
   }
 
   // ---- writing state ----
 
   function enqueue(args) {
-    if (root.stateSyncPending) return
-    // GK301's confirmed path is the keyboard panel, not the shared Mouse page.
-    if (["preset", "restore"].indexOf(args[0]) !== -1)
-      args = args.concat(["--panel-only"])
+    if (root.stateSyncPending || root.setupBusy) return
+    if (root.signalService) root.signalService.pauseAutomation()
     if (["preset", "reset", "restore"].indexOf(args[0]) !== -1)
       root.stateSyncPending = true
     root.stateGeneration += 1
@@ -127,14 +145,54 @@ Panel {
       root.busy = false
       return
     }
+    if (!root.signalService && Date.now() - root.lastWriteFinished < 2000) {
+      fallbackPacing.interval = Math.ceil(2000 - (Date.now() - root.lastWriteFinished))
+      fallbackPacing.restart()
+      return
+    }
     var args = root.queue[0]
     root.queue = root.queue.slice(1)
     worker.err = ""
-    console.log("Lecoo command:", JSON.stringify(args))
-    worker.command = [root.binary].concat(args)
     root.busy = true
-    worker.running = true
+    if (root.signalService) {
+      root.activeRequest = String(root) + ":" + String(++root.requestSerial)
+      root.signalService.submitPanelCommand(args, root.activeRequest)
+    } else {
+      worker.handled = false
+      worker.output = ""
+      worker.command = [root.binary].concat(args).concat(["--origin", "panel"])
+      worker.running = true
+    }
   }
+
+  function finishCommand(code, error, output) {
+    root.lastWriteFinished = Date.now()
+    if (output.indexOf("device:") === 0) root.debugText = output
+    if (code !== 0) {
+      root.queue = []
+      root.autoCycle = false
+      root.lastError = error || ("Command failed (" + code + ")")
+      root.stateSyncPending = false
+    } else root.lastError = ""
+    root.busy = false
+    root.runNext()
+    if (!root.busy) { root.refresh(); root.refreshBlackbox() }
+  }
+
+  Connections {
+    target: root.signalService
+    function onPanelCommandFinished(requestId, code, error, output) {
+      if (requestId === root.activeRequest) root.finishCommand(code, error, output)
+    }
+    function onCommandFinished() { root.refresh(); if (root.opened) root.refreshBlackbox() }
+  }
+  Timer { id: fallbackPacing; onTriggered: root.runNext() }
+  onBinaryChanged: {
+    root.removeController = false
+    root.removalConfirmed = false
+    if (signalService) signalService.binary = binary
+  }
+  onSignalServiceChanged: { if (signalService) signalService.binary = binary }
 
   // The panel command carries the whole panel configuration in one report, so
   // effect, brightness, speed and zone always land together.
@@ -200,11 +258,13 @@ Panel {
     root.refreshCatalog()
     root.refresh()
     root.refreshInfo()
+    cargoProbe.running = true
   }
 
   function open() {
     root.refresh()
     root.refreshInfo()
+    root.refreshBlackbox()
     if (scroller.contentItem) scroller.contentItem.contentY = 0
     root.controller.show()
   }
@@ -213,7 +273,7 @@ Panel {
     id: cycleTimer
     interval: Math.max(5, root.cycleSeconds) * 1000
     repeat: true
-    running: root.autoCycle
+    running: root.autoCycle && !root.setupBusy
     onTriggered: root.nextEffect()
   }
 
@@ -223,7 +283,7 @@ Panel {
   // quick one while the panel is open.
   Timer {
     interval: root.opened ? 2500 : 15000
-    running: true
+    running: !root.setupBusy
     repeat: true
     triggeredOnStart: true
     onTriggered: root.refresh()
@@ -231,7 +291,7 @@ Panel {
 
   Timer {
     interval: 15000
-    running: true
+    running: !root.setupBusy
     repeat: true
     onTriggered: root.refreshInfo()
   }
@@ -241,9 +301,12 @@ Panel {
   Process {
     id: worker
     property string err: ""
+    property string output: ""
+    property bool handled: true
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
+        worker.output = String(text || "").trim()
         if (worker.command.length > 1 && worker.command[1] === "doctor")
           root.debugText = String(text || "").trim()
       }
@@ -257,18 +320,19 @@ Panel {
     }
     onExited: function(code) {
       Qt.callLater(function() {
-        if (code !== 0) {
-          root.queue = []
-          root.autoCycle = false
-          root.lastError = worker.err !== "" ? worker.err : ("Command failed (" + code + ")")
-        } else {
-          root.lastError = ""
-          if (root.queue.length === 0) root.refresh()
-        }
-        root.busy = false
-        root.runNext()
-        if (!root.busy) root.refresh()
+        if (worker.handled) return
+        worker.handled = true
+        root.finishCommand(code, worker.err, worker.output)
       })
+    }
+    onRunningChanged: if (!running && !handled) fallbackFailureGuard.restart()
+  }
+  Timer {
+    id: fallbackFailureGuard
+    interval: 100
+    onTriggered: if (!worker.running && !worker.handled) {
+      worker.handled = true
+      root.finishCommand(1, worker.err || "Could not start the controller. Open Setup to install or verify it.", "")
     }
   }
 
@@ -304,30 +368,135 @@ Panel {
   }
 
   Process {
-    id: infoProc
-    property string err: ""
-    stderr: StdioCollector { waitForEnd: true; onStreamFinished: infoProc.err = String(text || "").trim() }
+    id: presenceProc
+    property string output: ""
+    command: [root.binary, "dev", "--json"]
+    stdout: StdioCollector { onStreamFinished: presenceProc.output = String(text || "") }
     onExited: function(code) {
-      Qt.callLater(function() {
-        if (code !== 0) {
-          root.firmware = ""
-          root.connectionError = infoProc.err || "Could not connect to the keyboard"
-        } else {
-          root.connectionError = root.firmware !== "" ? "" : "Could not read keyboard firmware"
-        }
-      })
-    }
-    command: [root.binary, "info", "--json"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        root.firmware = ""
-        try {
-          var data = JSON.parse(String(text || "{}"))
-          root.firmware = String(data.firmware || "")
-        } catch (e) {}
+      try {
+        if (code !== 0) throw new Error("unavailable")
+        var data = JSON.parse(output)
+        root.fallbackConnected = data.connected === true
+        root.fallbackWritable = data.writable === true
+        root.connectionError = !root.fallbackConnected ? "Ghost Mode · disconnected. Showing cached settings."
+          : !root.fallbackWritable ? "Keyboard connected · permission denied. Authorize device access in Setup." : ""
+      } catch (e) {
+        root.fallbackConnected = false
+        root.fallbackWritable = false
+        root.connectionError = "Controller unavailable. Open Setup to install or verify it."
       }
     }
+  }
+
+  Process {
+    id: blackboxProc
+    command: [root.binary, "blackbox", "--json"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          root.blackboxEntries = JSON.parse(String(text || "[]")).slice(0, 40)
+          root.blackboxError = ""
+        } catch (e) { root.blackboxError = "Could not read Blackbox history" }
+      }
+    }
+    onExited: function(code) { if (code !== 0) root.blackboxError = "Blackbox unavailable. Verify the controller in Setup." }
+  }
+
+  function beginLifecycle(steps) {
+    if (setupBusy || busy || queue.length > 0 || (signalService && signalService.busy)) return
+    root.autoCycle = false
+    root.setupBusy = true
+    if (signalService) signalService.suspended = true
+    root.lifecycleQueue = steps
+    root.runLifecycleStep()
+  }
+
+  function runLifecycleStep() {
+    if (lifecycleQueue.length === 0) {
+      root.setupBusy = false
+      root.lifecycleAction = ""
+      root.removalConfirmed = false
+      if (signalService) { signalService.suspended = false; signalService.reloadState() }
+      root.refreshCatalog(); root.refresh(); root.refreshInfo()
+      return
+    }
+    var step = lifecycleQueue[0]
+    root.lifecycleQueue = lifecycleQueue.slice(1)
+    root.lifecycleAction = step.label
+    root.setupMessage = step.label
+    if (step.detached) {
+      // This final command must outlive the plugin that it unloads.
+      Quickshell.execDetached(["omarchy", "plugin", "remove", "borat.lecoo-rgb", "--yes"])
+      root.setupMessage = "Plugin removal started. OmaLecoo will close when Omarchy unloads it."
+      root.lifecycleQueue = []
+      root.setupBusy = false
+      return
+    }
+    lifecycleProc.output = ""
+    lifecycleProc.error = ""
+    lifecycleProc.handled = false
+    lifecycleProc.command = step.argv
+    lifecycleProc.running = true
+  }
+
+  function finishLifecycle(code) {
+    if (lifecycleProc.handled) return
+    lifecycleProc.handled = true
+    if (code !== 0) {
+      root.setupMessage = lifecycleAction + " failed: " + (lifecycleProc.error || "Could not start or complete the command.")
+      root.lifecycleQueue = []
+      root.setupBusy = false
+      if (signalService) { signalService.suspended = false; signalService.reloadState() }
+      return
+    }
+    root.setupMessage = lifecycleAction + " completed. " + lifecycleProc.output.slice(-1500)
+    root.runLifecycleStep()
+  }
+
+  function installController() {
+    if (!cargoAvailable) { setupMessage = "Install Rust and Cargo first: omarchy pkg add rust"; return }
+    beginLifecycle([
+      { label: "Installing controller from source", argv: ["cargo", "install", "--git", "https://github.com/OnurByte/OmaLecoo", "--root", homePath + "/.local", "--locked"] },
+      { label: "Verifying installed controller", argv: [localBinary, "capabilities", "--json"] }
+    ])
+  }
+
+  function authorizeDeviceAccess() {
+    beginLifecycle([{ label: "Authorizing the GK301 udev rule", argv: ["pkexec", binary, "udev", "install"] }])
+  }
+
+  function uninstallSelected() {
+    if (!removalConfirmed) return
+    var steps = []
+    // Cleanup requiring the controller must finish before Cargo removes it.
+    if (removeUdev) steps.push({ label: "Removing the GK301 udev rule", argv: ["pkexec", binary, "udev", "remove"] })
+    if (removeState) steps.push({ label: "Removing OmaLecoo state and logs", argv: [binary, "state", "clear"] })
+    if (removeController && binary === localBinary)
+      steps.push({ label: "Uninstalling the local controller", argv: ["cargo", "uninstall", "--root", homePath + "/.local", "omalecoo"] })
+    if (removePlugin) steps.push({ label: "Removing the Omarchy plugin", detached: true })
+    if (steps.length === 0) { setupMessage = "Select an item to remove."; return }
+    beginLifecycle(steps)
+  }
+
+  Process {
+    id: cargoProbe
+    command: ["cargo", "--version"]
+    onExited: function(code) { root.cargoAvailable = code === 0 }
+  }
+  Process {
+    id: lifecycleProc
+    property string output: ""
+    property string error: ""
+    property bool handled: true
+    stdout: StdioCollector { onStreamFinished: lifecycleProc.output = String(text || "").trim() }
+    stderr: StdioCollector { onStreamFinished: lifecycleProc.error = String(text || "").trim() }
+    onExited: function(code) { Qt.callLater(function() { root.finishLifecycle(code) }) }
+    onRunningChanged: if (!running && !handled) lifecycleFailureGuard.restart()
+  }
+  Timer {
+    id: lifecycleFailureGuard
+    interval: 100
+    onTriggered: if (!lifecycleProc.running && !lifecycleProc.handled) root.finishLifecycle(1)
   }
 
   // ---- the panel itself ----
@@ -405,7 +574,7 @@ Panel {
 
               Text {
                 width: parent.width
-                text: "FW " + (root.firmware !== "" ? root.firmware : "—")
+                text: (root.deviceConnected ? "Cached settings" : "Ghost Mode · cached")
                       + "  ·  " + root.effectLabel(root.effect)
                       + "  ·  " + root.brightness + "/13"
                       + (root.autoCycle ? "  ·  auto " + root.cycleSeconds + " s" : "")
@@ -455,8 +624,38 @@ Panel {
             font.pixelSize: Style.font.caption
           }
 
+          Note {
+            width: parent.width
+            text: root.signalService ? root.signalService.connectionMessage : root.connectionError
+            color: root.deviceConnected && root.deviceWritable ? Color.muted : Color.urgent
+          }
+
+          Row {
+            id: navigation
+            width: parent.width
+            spacing: Style.space(4)
+            Repeater {
+              model: ["lighting", "automation", "blackbox", "setup", "uninstall"]
+              delegate: Button {
+                required property string modelData
+                width: (navigation.width - navigation.spacing * 4) / 5
+                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                fontSize: Style.font.caption
+                horizontalPadding: Style.space(2)
+                bordered: true
+                onClicked: { root.page = modelData; root.removalConfirmed = false; if (modelData === "blackbox") root.refreshBlackbox() }
+              }
+            }
+          }
+
           PanelSeparator { foreground: Color.foreground }
 
+          Column {
+            visible: root.page === "lighting"
+            width: parent.width
+            spacing: Style.space(10)
+            enabled: !root.setupBusy
+            opacity: root.deviceConnected ? 1 : 0.6
           // ---------- panel effects ----------
           Row {
             width: parent.width
@@ -708,9 +907,142 @@ Panel {
             font.pixelSize: Style.font.caption
           }
 
+          }
+
+          Column {
+            visible: root.page === "automation"
+            width: parent.width
+            spacing: Style.space(10)
+            PanelSectionHeader { text: "SIGNAL ENGINE"; foreground: Color.foreground }
+            Note {
+              width: parent.width
+              text: root.signalService ? root.signalService.activeRule + "\n" + root.signalService.ruleReason
+                : "Automation requires Omarchy’s built-in bar. Manual lighting controls remain available."
+            }
+            OptionRow {
+              width: parent.width
+              label: "Enable automation"
+              checked: root.signalService ? root.signalService.automationEnabled : false
+              enabled: !!root.signalService && !root.setupBusy
+              onToggled: root.signalService.setRules(!checked, root.signalService.restoreOnReconnect)
+            }
+            OptionRow {
+              width: parent.width
+              label: "Restore settings once after reconnect"
+              checked: root.signalService ? root.signalService.restoreOnReconnect : false
+              enabled: !!root.signalService && !root.setupBusy
+              onToggled: root.signalService.setRules(root.signalService.automationEnabled, !checked)
+            }
+            Note {
+              width: parent.width
+              text: "Priority: idle for 5 minutes → off; active fullscreen window → Game; otherwise → last manual settings. Manual actions pause automation for 30 minutes. Idle inhibitors are respected."
+            }
+            Note { width: parent.width; text: root.signalService ? root.signalService.lastOutcome : "" }
+          }
+
+          Column {
+            visible: root.page === "blackbox"
+            width: parent.width
+            spacing: Style.space(8)
+            PanelSectionHeader { text: "HID BLACKBOX"; foreground: Color.foreground }
+            Note { width: parent.width; text: "Recent vendor HID commands only. Firmware responses are acknowledgements; they do not report lighting state. Typed keys are never recorded." }
+            Button { text: "Refresh history"; onClicked: root.refreshBlackbox() }
+            Note { width: parent.width; text: root.blackboxError || (root.blackboxEntries.length === 0 ? "No recorded HID commands yet." : "Newest first · up to 40 entries") }
+            Repeater {
+              model: root.blackboxEntries
+              delegate: Column {
+                required property var modelData
+                width: parent.width
+                spacing: Style.space(3)
+                Note { width: parent.width; text: String(modelData.utc || "") + " · " + String(modelData.origin || "unknown") }
+                Note { width: parent.width; text: "Report: " + String(modelData.report || "No report sent"); font.family: "monospace"; wrapMode: Text.WrapAnywhere }
+                Note {
+                  width: parent.width
+                  text: String(modelData.result || "Unknown outcome")
+                    + " · syscall " + (modelData.syscall ? String(modelData.syscall.return) : "—")
+                    + (modelData.syscall && modelData.syscall.error ? " · " + modelData.syscall.error : "")
+                }
+                PanelSeparator { width: parent.width; foreground: Color.foreground }
+              }
+            }
+          }
+
+          Column {
+            visible: root.page === "setup"
+            width: parent.width
+            spacing: Style.space(10)
+            PanelSectionHeader { text: "SETUP"; foreground: Color.foreground }
+            Note { width: parent.width; text: "1. Install the controller from source into ~/.local. Cargo and Rust are required. The source is https://github.com/OnurByte/OmaLecoo." }
+            Note { width: parent.width; visible: !root.cargoAvailable; text: "Cargo was not found. Install the prerequisite: omarchy pkg add rust" }
+            Button {
+              text: "Install controller from source"
+              enabled: root.cargoAvailable && !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)
+              onClicked: root.installController()
+            }
+            Note { width: parent.width; text: "2. Authorize device access. A polkit password prompt installs only /etc/udev/rules.d/70-lecoo-gk301.rules for 1a2c:9df4 interface 01 and reloads udev. Reconnect the keyboard if access is still denied." }
+            Button {
+              text: "Authorize device access…"
+              enabled: !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)
+              onClicked: root.authorizeDeviceAccess()
+            }
+            Note { width: parent.width; text: "Controller path: " + root.binary; wrapMode: Text.WrapAnywhere }
+            Note { width: parent.width; visible: root.binary !== root.localBinary; text: "A custom controller path is configured. Source installation places a separate controller in ~/.local; update the widget’s binary setting to use it." }
+          }
+
+          Column {
+            visible: root.page === "uninstall"
+            width: parent.width
+            spacing: Style.space(10)
+            PanelSectionHeader { text: "REMOVE OMALECOO"; foreground: Color.foreground }
+            Note { width: parent.width; text: "Choose what to remove. State and device access are preserved unless selected. Cleanup finishes before the plugin is unloaded." }
+            OptionRow { width: parent.width; label: "Remove Omarchy plugin checkout"; checked: root.removePlugin; enabled: !root.setupBusy; onToggled: { root.removePlugin = !checked; root.removalConfirmed = false } }
+            OptionRow { width: parent.width; label: "Cargo uninstall controller under ~/.local"; checked: root.removeController; enabled: !root.setupBusy && root.binary === root.localBinary && root.cargoAvailable; onToggled: { root.removeController = !checked; root.removalConfirmed = false } }
+            Note { width: parent.width; visible: root.binary !== root.localBinary; text: "The configured binary is outside the managed ~/.local path. It will be left in place; remove it using its original installation method." }
+            OptionRow { width: parent.width; label: "Remove GK301 udev rule (polkit authorization)"; checked: root.removeUdev; enabled: !root.setupBusy; onToggled: { root.removeUdev = !checked; root.removalConfirmed = false } }
+            OptionRow { width: parent.width; label: "Delete OmaLecoo settings and diagnostic logs"; checked: root.removeState; enabled: !root.setupBusy; onToggled: { root.removeState = !checked; root.removalConfirmed = false } }
+            Button {
+              visible: !root.removalConfirmed
+              text: "Review selected removal…"
+              enabled: !root.setupBusy && (root.removePlugin || root.removeController || root.removeUdev || root.removeState)
+              onClicked: root.removalConfirmed = true
+            }
+            Note {
+              width: parent.width
+              visible: root.removalConfirmed
+              color: Color.urgent
+              text: "Confirm removal of: " + [root.removePlugin ? "plugin checkout" : "", root.removeController ? "local controller" : "", root.removeUdev ? "udev rule" : "", root.removeState ? "settings and logs" : ""].filter(function(v) { return v !== "" }).join(", ") + "."
+            }
+            Button {
+              visible: root.removalConfirmed
+              text: "Confirm removal"
+              enabled: !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)
+              onClicked: root.uninstallSelected()
+            }
+            Button { visible: root.removalConfirmed; text: "Cancel"; enabled: !root.setupBusy; onClicked: root.removalConfirmed = false }
+          }
+          Note { width: parent.width; visible: root.setupMessage !== ""; text: root.setupMessage; wrapMode: Text.WrapAnywhere }
+
         }
       }
     }
+  }
+
+  component Note: Text {
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    color: Color.muted
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+  }
+
+  component OptionRow: Row {
+    id: option
+    property string label: ""
+    property bool checked: false
+    signal toggled()
+    spacing: Style.space(8)
+    Note { width: option.width - optionSwitch.width - option.spacing; text: option.label; anchors.verticalCenter: parent.verticalCenter }
+    ToggleSwitch { id: optionSwitch; checked: option.checked; foreground: Color.foreground; accent: Color.accent; onToggled: option.toggled() }
   }
 
   // Compact chip with an index number and an elided label; the stock Button
