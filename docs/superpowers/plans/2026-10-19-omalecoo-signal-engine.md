@@ -59,6 +59,7 @@
 **Files:**
 - Create: `SignalService.qml`
 - Modify: `manifest.json`
+- Modify: `Cargo.toml` to identify this v1.5 development line as version `1.5.0`.
 - Modify: `BarWidget.qml`
 - Modify: `Panel.qml`
 
