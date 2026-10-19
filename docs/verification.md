@@ -1,4 +1,4 @@
-# Release verification — 1.4.0
+# Release verification — 1.4.1
 
 Run from the project directory:
 
@@ -8,7 +8,25 @@ cargo clippy --all-targets -- -D warnings
 cargo build --release
 node tests/ui-state.cjs
 bash -n install.sh scripts/install-udev.sh
+omarchy plugin validate "$PWD"   # plugin folder contract, from the marketplace guide
 ```
+
+## What changed in 1.4.1 (marketplace-ready layout)
+
+- `manifest.json`, `BarWidget.qml`, `Panel.qml` moved to the repo root, so
+  `omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable`
+  clones an already-valid plugin folder (`omarchy plugin validate` passes).
+- Manifest gains the `license: "MIT"` field and states version 1.4.1.
+- `install.sh` builds from source, installs the binary, and skips the copy
+  step when invoked from an Omarchy plugin directory (clones created by
+  `omarchy plugin add`).
+- README: Install is the first section, with the marketplace one-liner,
+  `cargo install --git` and the prebuilt release asset as binary options;
+  the recovered-protocol block now reads `brightness 0-13`.
+- Published to GitHub as OnurByte/OmaLecoo; release v1.4.1 ships the
+  x86_64 binary plus a `checksums.txt`.
+
+## Historical — 1.4.0 (profiles removed; Rust-only tooling)
 
 ## What changed in 1.4.0 (profiles removed; Rust-only tooling)
 
