@@ -205,11 +205,13 @@ arrow keys; FN+2 lights TAB, SHIFT, CTRL, QWER, HOME, PRTSC, SCRLK, PGUP,
 END and PGDN.
 
 **The host cannot choose a zone.** The recovered report has no field for it,
-the original Windows tool does not send one either, and the keyboard keeps
-the chosen zone across host commands. What the plugin can do is re-apply the
-**Gaming Special Key** effect — that is what the **Game** preset and the
-fullscreen rule do — and the keyboard then lights whichever zone its own FN
-key last selected.
+no command for one has been found, and the keyboard keeps the chosen zone
+across host commands. The host cannot even *see* the zone: a 100-second
+recording of the keyboard's vendor interface produced no input reports at
+all, so there is no report that carries the current selection. What the
+plugin can do is re-apply the **Gaming Special Key** effect — that is what
+the **Game** preset and the fullscreen rule do — and the keyboard then lights
+whichever zone its own FN key last selected.
 
 The **M1 / M2 / M3 loader** is a different thing: it is the original tool's
 own control, it travels in the same report, and its effect on this unit was

@@ -34,12 +34,26 @@ Two further results from the same session:
   same brightness and speed showed no change for M1 or M2 and a visible
   change for M3. The panel labels the control *Loader* and says its effect
   was not confirmed, instead of presenting it as a zone selector.
-- The **original Windows tool does not select zones either**. Its
-  `HidDevice::SetOutputReport` method is present in the binary (log tag
-  `0x692cc0`, implementation `0x4050e0`) but the complete disassembly has
-  five calls into the `SetFeature` wrapper and none into the output path.
-  The vendor interface's report ID 7 does declare an Output item, so a
-  channel exists; nothing recovered uses it.
+- The **original Windows tool's zone path is not settled by the static
+  call graph**. Its `HidDevice::SetOutputReport` method is present in the
+  binary (log tag `0x692cc0`, implementation `0x4050e0`) and the complete
+  disassembly has five calls into the `SetFeature` wrapper and none into it,
+  but the class also has a `Write` method (`0x404a54`), and `WriteFile` on a
+  HID handle is the other way an output report reaches the device. The same
+  program was seen sending `05 01 00…` … `05 04 00…` output frames at
+  start-up for a sibling model, so the output path is live; only a dynamic
+  recording on this hardware would settle it. The vendor interface's report
+  ID 7 does declare an Output item, so the channel exists.
+- The **zone cannot be observed from the host**. A 100-second recording of
+  the vendor interface (`/dev/hidraw1`) produced **zero** input reports,
+  while the boot interface (`/dev/hidraw0`) produced 110 in the same window.
+  The descriptor declares input reports 1–6 on that interface — a consumer
+  report, a vendor report (page `0xFF00`, byte `0xF1`–`0xF8`) and three
+  keyboard-state reports — and this firmware uses none of them. The FN
+  combinations add no distinguishable report to the ordinary boot traffic.
+  There is no channel to watch the zone over, so a host-side zone *reader*
+  is not possible on this unit; only a host-side zone *writer* would be,
+  and no command for one has been found.
 
 The keyboard's ten lighting layouts are now their own model
 (`src/zones.rs`, `lecoo-gk301 zones list`, and the panel's *Gaming zones*

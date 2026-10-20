@@ -77,14 +77,57 @@ controller sends.
 - The **FN zone lives in the keyboard**. The host can enter the special-key
   lighting with the `Gaming Special Key` effect, and the keyboard then lights
   whichever group its own FN key last selected.
-- The recovered protocol has no field for the zone. The original Windows tool
-  does not send one either: its `HidDevice::SetOutputReport` method exists in
-  the binary (log tag at `0x692cc0`, implementation at `0x4050e0`) but no call
-  site reaches it — the complete disassembly has five calls into the
-  `SetFeature` wrapper (`0x404cb0`) and none into the output path.
+- The recovered protocol has no field for the zone.
+- The **vendor interface sends no input reports at all**. A 100-second
+  recording of `/dev/hidraw1` (interface 1, the one the controller writes to)
+  produced **zero** input reports, while the boot interface
+  (`/dev/hidraw0`) produced 110 in the same window. The report descriptor
+  declares input reports 1–6 on interface 1 — a consumer report, a vendor
+  report (page `0xFF00`, byte `0xF1`–`0xF8`) and three keyboard-state
+  reports — and this firmware uses none of them. **There is no channel to
+  observe the zone from.** The only key events the keyboard sends are the
+  ordinary boot-protocol reports on interface 0, and the FN combinations do
+  not add a distinguishable report to them.
 - The keyboard's ten zones are hardware layouts, listed in the manufacturer's
   GK301 guide: FN+1 FPS 1, FN+2 FPS 2, FN+3 COD, FN+4 RTS, FN+5 LOL, FN+6
   Racing, FN+7 NBA, FN+8 LOL II, FN+9 Custom I, FN+0 Custom II.
+
+### What the original tool does about it
+
+The Windows tool's `HidDevice` class exposes `Open`, `Close`, `Read`,
+`Write`, `GetFeature`, `SetFeature`, `SetOutputReport` and `GetInputReport`.
+The `SetOutputReport` method (log tag `0x692cc0`, implementation `0x4050e0`)
+has no direct call site — the disassembly has five calls into the
+`SetFeature` wrapper (`0x404cb0`) and none into it — but the class also has a
+`Write` method (`0x404a54`), and `WriteFile` on a HID handle is the other
+way an output report reaches the device. The same program family
+(`ShinetekTools.exe`) was seen sending `05 01 00…` … `05 04 00…` output
+frames at start-up by another researcher, so the original tool's output
+path is live and the static call graph alone cannot rule it out.
+
+That output path is **not** the loader either: the loader rides in byte 6 of
+the feature report, exactly as the disassembly of the normal writer shows
+(`0x41ff71..0x41ff93`).
+
+### The sibling model in the same program family
+
+`ShinetekTools.exe` is shared across keyboards from vendor `0x1A2C`. The
+research on the AULA F3009 (`0x1A2C:7F05`) documents the same frame layout
+`07 FF FF <effect> <brightness> <speed> 00 00`, the same 20 effects, the
+same 0–5 brightness range and the same 0–2 speed range as this keyboard,
+and it records the same behaviour that matters here: **on that keyboard the
+M1/M2 keys produce no HID events at all in wired mode**, and their meaning
+depends on a mode the keyboard itself keeps.
+
+The one field that differs is byte 6. The F3009's official software always
+writes `00 00` there and the meaning of those two bytes is listed as
+unknown; the GK301's writer puts the loader in byte 6 and the original tool
+exposes M1/M2/M3 for it. So the loader is a GK301-side use of a byte the
+shared software leaves open — which fits the observation that only one of
+the three values does anything visible.
+
+Frames captured for the F3009 are **not** sent to this keyboard: different
+model, different firmware, and the report lengths differ.
 
 OmaLecoo therefore keeps the loader at M1/M2/M3, labels it as the original
 tool's loader rather than a zone selector, and lists the ten hardware zones
@@ -115,13 +158,30 @@ claim it.
 
 The plugin therefore presents the control as **Loader** (the original tool's
 name for it), states that its effect was not confirmed, and lists the ten
-hardware zones separately as information. A dedicated A/B run with the zone
-read from the keyboard each time would still settle the question; it needs
-someone watching the keyboard, which this session did not have.
+hardware zones separately as information.
+
+Two paths would still settle it, and neither is a code change:
+
+- Someone watching the keyboard while the three loader values are sent in
+  turn, with the FN zone known beforehand. That needs eyes on the keyboard,
+  which this session did not have.
+- A dynamic recording of the original Windows tool on this hardware, the way
+  `HidDevice::Write` and `HidDevice::SetOutputReport` were hooked for the
+  sibling model in the same program family. That needs a Windows session
+  with this keyboard attached, which this session did not have either.
+
+Until one of them exists, the plugin says "not confirmed" instead of guessing.
 
 ## Boundaries
 
 No firmware was modified, no key report was retained, and no random command
 was sent. The visual observations come from the user; the capture only proves
-which bytes reached the device. The nine zones are hardware presets, and this
+which bytes reached the device. The ten zones are hardware presets, and this
 record does not claim a protocol for choosing them.
+
+The input-report recording that closed the observation channel was made with
+a small Rust reader on the two `hidraw` nodes of the keyboard. It wrote
+every boot report it saw to a log file that was deleted afterwards, and only
+the *shape* of the traffic is quoted here — the vendor interface produced no
+input reports at all, so nothing about the typed keys is part of this
+record.
