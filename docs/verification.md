@@ -345,6 +345,32 @@ The 20 October 2026 live session covered the panel, the service and the rule
 arbitration; see the live-session section above for what it did and did not
 cover. Historical test results below do not validate these features.
 
+## Recorded checks — 20 October 2026 (macro markup hardening)
+
+Marketplace issue #12315 (omarchy-plugin-marketplace) reported that an
+imported macro name could carry HTML markup into a QML `Text` element that
+still used the default rich-text format, so an image tag in a third-party
+macro document could make the shell process issue unsolicited network
+requests. The shell's `Note` text component, the error banner and the debug
+line already rendered `Text.PlainText`; the remaining row texts now set it
+explicitly:
+
+- `Panel.qml` — macro-name row, key listing name row and the three zone
+  listing row texts set `textFormat: Text.PlainText`.
+- `src/macros.rs` — new `clean_text` strips control characters and caps a
+  name or group at 80 characters. `Macro::from_json` applies it on import
+  and load; a group that normalizes to empty falls back to `Group 0`.
+- `src/commands.rs` — `macro save` applies the same normalization and
+  rejects a name that becomes empty.
+
+Checks after the fix: `cargo check` passes, `cargo test --locked
+--offline` reports 2 passed, 0 failed, `cargo build --locked --offline`
+passes, `omarchy plugin validate .` exits 0, `qml6 Panel.qml` parses
+clean, `git diff --check` is clean. No live lighting sweep or device
+traffic was involved; the reporter's three cited locations
+(src/commands.rs macro import, src/macros.rs from_json, Panel.qml macro
+rows) were all addressed.
+
 ## Historical — 1.4.1 (marketplace layout)
 
 - Moved `manifest.json`, `BarWidget.qml` and `Panel.qml` to the repository root

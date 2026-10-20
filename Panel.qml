@@ -1190,6 +1190,7 @@ Panel {
               Text {
                 width: Style.space(52)
                 text: String(modelData.key || "")
+                textFormat: Text.PlainText
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
@@ -1197,6 +1198,7 @@ Panel {
               Text {
                 width: Style.space(80)
                 text: String(modelData.name || "")
+                textFormat: Text.PlainText
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
@@ -1204,6 +1206,7 @@ Panel {
               Text {
                 width: parent.width - Style.space(138)
                 text: String(modelData.lights || "")
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
@@ -1365,6 +1368,7 @@ Panel {
                   Text {
                     width: parent.width
                     text: String(modelData.name || "")
+                    textFormat: Text.PlainText
                     color: Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.body
@@ -1502,6 +1506,7 @@ Panel {
                   Text {
                     width: parent.width
                     text: String(modelData.name || "")
+                    textFormat: Text.PlainText
                     color: Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption

@@ -384,13 +384,20 @@ fn macro_command(args: &[String], device: Option<&str>, origin: &str) -> Result<
             let steps_json = opt_value(args, "--steps")
                 .ok_or("macro save needs --steps <json array of steps>")?;
             let steps = macros::parse_steps(&steps_json)?;
-            let group = opt_value(args, "--group").unwrap_or_else(|| "Group 0".to_string());
+            let group = match opt_value(args, "--group") {
+                Some(group) => macros::clean_text(&group),
+                None => "Group 0".to_string(),
+            };
+            let name = macros::clean_text(&name);
+            if name.is_empty() {
+                return Err("macro save needs a non-empty macro name".into());
+            }
             let repeat = opt_value(args, "--repeat")
                 .and_then(|value| value.parse::<u32>().ok())
                 .unwrap_or(1)
                 .clamp(1, 64);
             let macro_def = macros::Macro {
-                name: name.trim().to_string(),
+                name: name.clone(),
                 group,
                 repeat,
                 steps,

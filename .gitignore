@@ -1,5 +1,6 @@
 /target
 /.worktrees
+/.serena
 /reference
 /archive
 docs/rea-color-evidence.json

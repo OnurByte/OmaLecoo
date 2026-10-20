@@ -23,6 +23,23 @@ use crate::state::State;
 /// Name of the macro document inside the state directory.
 pub const MACRO_FILE: &str = "macros.json";
 
+/// Longest macro name or group the panel's listing rows are sized for.
+const TEXT_LIMIT: usize = 80;
+
+/// Normalizes a name or group coming from a macro document: control
+/// characters are removed and the text is capped before it is stored. The
+/// panel renders these strings as plain text, and every other consumer of
+/// the stored document inherits the same bounded form.
+pub fn clean_text(value: &str) -> String {
+    value
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(TEXT_LIMIT)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
 /// One lighting step of a macro.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Step {
@@ -108,17 +125,25 @@ impl Macro {
         })
     }
 
-    /// Reads a macro, rejecting malformed documents.
+    /// Reads a macro, rejecting malformed documents. The name and group pass
+    /// through `clean_text`, so a third-party document cannot carry control
+    /// characters or unbounded strings into the panel and the shell process.
     pub fn from_json(value: &Value) -> Option<Macro> {
-        let name = value.get("name")?.as_str()?.trim().to_string();
+        let name = clean_text(value.get("name")?.as_str()?);
         if name.is_empty() {
             return None;
         }
-        let group = value
-            .get("group")
-            .and_then(Value::as_str)
-            .unwrap_or("Group 0")
-            .to_string();
+        let group = clean_text(
+            value
+                .get("group")
+                .and_then(Value::as_str)
+                .unwrap_or("Group 0"),
+        );
+        let group = if group.is_empty() {
+            "Group 0".to_string()
+        } else {
+            group
+        };
         let repeat = value
             .get("repeat")
             .and_then(Value::as_u64)
