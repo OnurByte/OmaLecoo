@@ -13,12 +13,12 @@ below says which is which.
 | 2 | **Function/media key programming** — the `funkey` and `combkey` lists in `config.xml` (Volume, Mute, Media keys, Ctrl+C, Win+D, launching apps) | **Adapted — a key map plus a Hyprland fragment** | Those mappings were application-level and backed by the Windows filter driver. On Linux the compositor owns them. The plugin keeps the original's key names and codes, lets you pick the command per key, and writes a Hyprland fragment you include from your own config. The original's *combination* list (`ctrl+c`, `win+d`, …) is **not** reproduced, because on Linux those combinations are ordinary shortcuts the desktop already has. |
 | 3 | **Settings → Restore (factory defaults)** | **Equivalent** | `lecoo-gk301 restore --factory` applies the same default record the Windows tool starts with (Steady, brightness 5, speed 2, first option) and makes it the new manual state. The panel exposes it as *Restore factory lighting defaults*. |
 
-One control from the original is **not confirmed** to do anything on this
-unit: the **M1/M2/M3 loader**. The controller sends the byte exactly as the
-original does, and the byte is documented, but the lit key group did not
-change in the observations so far. The panel labels it *Loader* and says so
-rather than presenting it as a zone selector. See
-[lighting-zone-capture.md](captures/lighting-zone-capture.md).
+One control from the original has a **settled, narrower behavior** on this
+unit: the **M1/M2/M3 loader**. Raw sweeps on 20 October 2026 lit the
+special-key group only for the third loader value; the first two render
+dark at every tested combination, and the original sends the same values
+with the same result. The gaming path applies M3 and the panel keeps no
+loader row. See [lighting-zone-capture.md](captures/lighting-zone-capture.md).
 
 Everything else in the Windows tool is either matched, exceeded, or excluded
 with evidence.
@@ -33,9 +33,9 @@ disassembly notes in [custom-color-investigation.md](custom-color-investigation.
 | Panel color effects | 20 effects, `Steady` … `Sine wave` | the same 20, same order (`lecoo-gk301 catalog --json`), shown in the panel under the original names | **Equal** |
 | Speed | 0–2 | 0–2 | **Equal** |
 | Brightness | 0–5 in the UI (the stored record carries 13) | 0–13 | **Plugin exceeds it** — the clamp was application-side, and the user confirmed 5 vs 13 on the device ([experiment](captures/extended-brightness-experiment.md)) |
-| Gaming-key selection | M1/M2 (M3 radio is zero-sized) | `select` 0–2, labeled M1/M2 | **Equal** |
+| Gaming-key selection | M1/M2 (M3 radio is zero-sized) | the gaming path applies the third loader value (M3) | **Equal in behavior** — on this unit only the third value lights the special-key group; the tool's M1/M2 render dark the same way |
 | Direction (Left/Right) | A radio on the first settings page | not offered | **No device-level difference** — the Windows normal writer overwrites the direction byte with the selection byte and never transmits it (`0x41ff71..0x41ff93`). The app shows a control the device never receives. |
-| M1/M2/M3 loader | Three values, offered for the gaming-key effect | sent, unconfirmed | The byte is sent exactly as the original sends it and the wire value is documented, but the lit key group did not change in the observations. It is not a zone selector, and the panel does not claim it is. |
+| M1/M2/M3 loader | Three values, offered for the gaming-key effect | M3 applied; no loader row | The raw sweeps settled it: wire loader 0 and 1 leave the board dark at every tested brightness and encoding, wire 2 lights the current FN-zone group, and values above 2 blink and fall back. It is not a zone selector, and the panel does not claim it is. |
 | Per-effect control pages | Steady: brightness only · Gaming key: brightness + M1/M2 · Effects 2–19: speed + brightness | one uniform record: effect + brightness + speed + selection | **Plugin is a superset** — it can set every field for every effect; the Windows app hides fields per effect. |
 | Side LED page | 12 side effects, brightness 0–7, on the hidden Mouse page | not offered | **Correctly excluded** — the side writer produced no physical change on this keyboard ([failure analysis](side-failure-analysis.md)) |
 | Custom color / per-key RGB | `color.xml` is the SOUI UI palette, not a lighting control | not offered | **Correctly excluded** — no RGB-triplet or per-key sender exists in the recovered paths ([investigation](custom-color-investigation.md)) |

@@ -28,6 +28,14 @@ Panel {
   readonly property string homePath: Quickshell.env("HOME")
   readonly property string binary: setting("binary", "") || (homePath + "/.local/bin/lecoo-gk301")
   readonly property string localBinary: homePath + "/.local/bin/lecoo-gk301"
+  readonly property string cachePath: Quickshell.env("XDG_CACHE_HOME") || (homePath + "/.cache")
+  // The checkout the shell cloned: the directory that holds this file.
+  // Self-setup builds from it, so installation never executes a source
+  // location other than the exact directory the plugin placed on disk.
+  readonly property string pluginRootPath: {
+    var url = String(Qt.resolvedUrl("Panel.qml")).replace(/^file:\/\//, "")
+    return decodeURIComponent(url.substring(0, url.lastIndexOf("/")))
+  }
   readonly property bool deviceConnected: signalService ? signalService.connected : fallbackConnected
   readonly property bool deviceWritable: signalService ? signalService.writable : fallbackWritable
   property bool fallbackConnected: false
@@ -53,7 +61,7 @@ Panel {
   property int effect: 0
   property int brightness: 5
   property int speed: 2
-  property int select: 0
+  property int select: 2
   property string panelName: ""
   property string lastError: ""
   property string connectionError: ""
@@ -342,18 +350,6 @@ Panel {
     root.pushPanel()
   }
 
-  function setSelect(value) {
-    if (root.stateSyncPending) return
-    var s = Math.max(0, Math.min(2, Math.round(Number(value) || 0)))
-    if (s === root.select) return
-    root.select = s
-    root.pushPanel()
-  }
-
-
-
-
-
   function applyPreset(name) { root.enqueue(["preset", name]) }
 
 
@@ -364,6 +360,7 @@ Panel {
     root.refreshInfo()
     root.refreshCargo()
     root.refreshZones()
+    root.scheduleAutoSetup()
   }
 
   function open() {
@@ -639,7 +636,7 @@ Panel {
   function installController() {
     if (!cargoAvailable) { setupMessage = "Install Rust and Cargo first: omarchy pkg add rust"; return }
     beginLifecycle([
-      { label: "Installing controller from source", argv: ["cargo", "install", "--git", "https://github.com/OnurByte/OmaLecoo", "--root", homePath + "/.local", "--locked"] },
+      { label: "Installing controller from source", argv: ["cargo", "install", "--path", pluginRootPath, "--root", homePath + "/.local", "--locked", "--target-dir", cachePath + "/lecoo-gk301"] },
       { label: "Verifying installed controller", argv: [localBinary, "capabilities", "--json"] }
     ])
   }
@@ -680,6 +677,175 @@ Panel {
     id: lifecycleFailureGuard
     interval: 100
     onTriggered: if (!lifecycleProc.running && !lifecycleProc.handled) root.finishLifecycle(1)
+  }
+
+  // ---- self-setup on first enable ----
+  // omarchy plugin add leaves the plugin enabled but unconfigured: the shell
+  // loads the widget and the service, while the native controller and the udev
+  // rule exist only after an install command and one polkit approval. To stay
+  // installable as a standard plugin, the first load performs those steps
+  // itself: it builds the controller from the checkout the shell cloned (the
+  // exact directory this file lives in), verifies the installed binary, and
+  // raises one polkit prompt for the udev rule while the keyboard is attached
+  // but denied. When cargo is missing, the chain starts with Omarchy's own
+  // package command. Every step goes through its own approval prompt, a
+  // failure ends the chain, and a failed chain does not retry this session.
+  property bool autoSetupAttempted: false
+  property string autoSetupStage: ""
+  property string autoSetupLastStep: ""
+  property var autoSetupQueue: []
+
+  Process {
+    id: autoProbe
+    property string output: ""
+    property bool handled: true
+    command: [root.binary, "dev", "--json"]
+    stdout: StdioCollector { onStreamFinished: autoProbe.output = String(text || "") }
+    onExited: function(code) {
+      autoProbe.handled = true
+      Qt.callLater(function() { root.autoSetupProbeFinished(code) })
+    }
+    onRunningChanged: if (!running && !handled) autoProbeFailureGuard.restart()
+  }
+  Timer {
+    id: autoProbeFailureGuard
+    interval: 100
+    onTriggered: if (!autoProbe.running && !autoProbe.handled) {
+      autoProbe.handled = true
+      root.autoSetupProbeFinished(1)
+    }
+  }
+
+  Process {
+    id: autoStepProc
+    property string output: ""
+    property string error: ""
+    property bool handled: true
+    stdout: StdioCollector { onStreamFinished: autoStepProc.output = String(text || "").trim() }
+    stderr: StdioCollector { onStreamFinished: autoStepProc.error = String(text || "").trim() }
+    onExited: function(code) {
+      autoStepProc.handled = true
+      Qt.callLater(function() { root.autoSetupStepFinished(code) })
+    }
+    onRunningChanged: if (!running && !handled) autoStepFailureGuard.restart()
+  }
+  Timer {
+    id: autoStepFailureGuard
+    interval: 100
+    onTriggered: if (!autoStepProc.running && !autoStepProc.handled) {
+      autoStepProc.handled = true
+      root.autoSetupStepFinished(1)
+    }
+  }
+
+  function scheduleAutoSetup() {
+    if (root.autoSetupAttempted) return
+    root.autoSetupAttempted = true
+    // A configured custom controller path means the binary is managed outside
+    // this plugin; it installs nothing and touches no state.
+    if (root.binary !== root.localBinary) return
+    autoProbe.running = true
+  }
+
+  function autoSetupProbeFinished(code) {
+    if (root.autoSetupStage === "running") return
+    var controller = code === 0
+    var connected = false
+    var writable = false
+    if (controller) {
+      try {
+        var data = JSON.parse(String(autoProbe.output || "{}"))
+        connected = data.connected === true
+        writable = data.writable === true
+      } catch (e) {}
+    }
+    var steps = []
+    if (!controller) {
+      steps.push({ label: "Checking the Rust toolchain", argv: ["cargo", "--version"] })
+    }
+    if (!controller) {
+      steps.push({
+        label: "Installing controller from source",
+        argv: [
+          "cargo", "install", "--path", root.pluginRootPath,
+          "--root", root.homePath + "/.local", "--locked",
+          "--target-dir", root.cachePath + "/lecoo-gk301"
+        ]
+      })
+      steps.push({ label: "Verifying installed controller", argv: [root.localBinary, "capabilities", "--json"] })
+    }
+    if (connected && !writable) {
+      steps.push({ label: "Authorizing the GK301 udev rule", argv: ["pkexec", root.binary, "udev", "install"] })
+      steps.push({ label: "Verifying device access", argv: [root.binary, "dev", "--json"] })
+    }
+    if (steps.length === 0) return
+    root.autoSetupStage = "running"
+    root.autoSetupQueue = steps
+    root.autoSetupNext()
+  }
+
+  function autoSetupNext() {
+    if (root.setupBusy || root.busy || root.queue.length > 0 || (root.signalService && root.signalService.busy)) {
+      // A panel command is in flight; end the attempt instead of racing it.
+      root.autoSetupStage = ""
+      root.autoSetupQueue = []
+      return
+    }
+    if (root.autoSetupQueue.length === 0) {
+      root.autoSetupStage = "done"
+      // Intermediate per-step messages end here; result messages keep their
+      // own wording (they do not start with the bare step prefix).
+      if (root.setupMessage.indexOf("Auto setup: ") === 0) {
+        root.setupMessage = "Auto setup complete: the controller is installed in ~/.local."
+      }
+      return
+    }
+    var step = root.autoSetupQueue[0]
+    root.autoSetupLastStep = step.label
+    root.autoSetupQueue = root.autoSetupQueue.slice(1)
+    root.setupMessage = "Auto setup: " + step.label + "…"
+    autoStepProc.output = ""
+    autoStepProc.error = ""
+    autoStepProc.handled = false
+    autoStepProc.command = step.argv
+    autoStepProc.running = true
+  }
+
+  function autoSetupStepFinished(code) {
+    if (code === 0) {
+      if (root.autoSetupLastStep === "Verifying device access") {
+        try {
+          var data = JSON.parse(String(autoStepProc.output || "{}"))
+          root.setupMessage = data.writable === true
+            ? "Auto setup complete: the controller is installed and the keyboard is writable."
+            : "Auto setup complete. Reconnect the keyboard once if it is still read-only."
+        } catch (e) {
+          root.setupMessage = "Auto setup complete. The device status is in the bar."
+        }
+      }
+      root.autoSetupNext()
+      return
+    }
+    if (root.autoSetupLastStep === "Checking the Rust toolchain") {
+      // Cargo is missing; Omarchy's own package command installs it, and the
+      // build continues when the step is approved.
+      root.autoSetupQueue = [{ label: "Installing the Rust toolchain", argv: ["omarchy", "pkg", "add", "rust"] }]
+        .concat(root.autoSetupQueue)
+      root.autoSetupNext()
+      return
+    }
+    root.autoSetupStage = ""
+    root.autoSetupQueue = []
+    root.setupMessage = "Auto setup stopped at '" + root.autoSetupLastStep + "'. "
+      + (autoStepProc.error || "The step could not be completed; retry from the Setup page.")
+  }
+
+  function autoSetupStepSpawnFailed() {
+    root.autoSetupStage = ""
+    root.autoSetupQueue = []
+    root.setupMessage = root.autoSetupLastStep
+      ? "Auto setup stopped at '" + root.autoSetupLastStep + "': the command did not start."
+      : "Auto setup could not start."
   }
 
   // ---- the panel itself ----
@@ -993,43 +1159,14 @@ Panel {
             }
           }
 
-          // ---------- Windows loader (M1 / M2 / M3) ----------
-          // The original tool's loader values. They ride in the same report
-          // as the effect, and they are not a zone selector: changing them
-          // does not move the lit key group.
-          Row {
-            width: parent.width
-            spacing: Style.space(8)
-            enabled: root.effect === 1
-            opacity: root.effect === 1 ? 1 : 0.45
-
-            Text {
-              width: Style.space(88)
-              height: Style.space(28)
-              text: "Loader"
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.caption
-              verticalAlignment: Text.AlignVCenter
-            }
-
-            ButtonGroup {
-              options: [
-                { value: "0", label: "M1" },
-                { value: "1", label: "M2" },
-                { value: "2", label: "M3" }
-              ]
-              value: String(root.select)
-              foreground: Color.foreground
-              background: Color.popups.background
-              accent: Color.accent
-              onChanged: function(v) { root.setSelect(Number(v)) }
-            }
-          }
-
+          // ---------- gaming loader ----------
+          // The firmware keeps the special-key lighting in the third loader
+          // slot. The first two render no light on this unit (the Windows
+          // tool darkens the same way with its M1 and M2), so the panel
+          // applies the third value and offers no dead control.
           Note {
             width: parent.width
-            text: "M1, M2 and M3 are the original Windows tool's loader values. They are not the key group that glows, and they were not confirmed to change anything on this unit — the loader byte carries them, the hardware's reaction is a separate question."
+            text: "Gaming Special Key lights the keyboard's built-in special-key group for the zone its FN key last selected, using the third loader value (M3). The tool's first two loader values leave this board dark at every tested brightness, so the panel applies M3 and the brightness slider drives the effect."
           }
 
           // ---------- gaming zones ----------
@@ -1441,7 +1578,9 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
             PanelSectionHeader { text: "SETUP"; foreground: Color.foreground }
-            Note { width: parent.width; text: "1. Install the controller from source into ~/.local. Cargo and Rust are required. The source is https://github.com/OnurByte/OmaLecoo." }
+            Note { width: parent.width; text: "After the plugin is enabled, the first load performs setup by itself: it builds the controller from this checkout, verifies the binary and raises one polkit prompt for the udev rule while the keyboard is connected but denied. This page keeps the same steps as buttons and shows the current setup message." }
+            Note { width: parent.width; visible: root.setupMessage !== ""; text: root.setupMessage; wrapMode: Text.WrapAnywhere }
+            Note { width: parent.width; text: "Manual falls back: install the controller into ~/.local with Cargo and Rust, or press the button below. The build uses this checked-out source, not a remote URL." }
             Note { width: parent.width; visible: !root.cargoAvailable; text: "Cargo was not found. Install the prerequisite: omarchy pkg add rust" }
             Button { text: "Refresh Cargo availability"; enabled: !root.setupBusy; onClicked: root.refreshCargo() }
             Button {
@@ -1449,7 +1588,7 @@ Panel {
               enabled: root.cargoAvailable && !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)
               onClicked: root.installController()
             }
-            Note { width: parent.width; text: "2. Authorize device access. A polkit password prompt installs only /etc/udev/rules.d/70-lecoo-gk301.rules for 1a2c:9df4 interface 01 and reloads udev. Reconnect the keyboard if access is still denied." }
+            Note { width: parent.width; text: "A polkit password prompt installs only /etc/udev/rules.d/70-lecoo-gk301.rules for 1a2c:9df4 interface 01 and reloads udev. Reconnect the keyboard if access is still denied." }
             Button {
               text: "Authorize device access…"
               enabled: !root.setupBusy && !root.busy && !(root.signalService && root.signalService.busy)

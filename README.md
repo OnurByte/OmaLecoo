@@ -4,27 +4,24 @@
 
 # OmaLecoo
 
-### Your GK301, at home in Omarchy.
+Native lighting control and an event-aware automation service for the Lecoo
+GK301, built with Rust and Quickshell for SEMICO `1a2c:9df4`.
 
-**20 lighting effects · 14 brightness levels · a local HID flight log**
-
-Native bar controls and an event-aware lighting service for the Lecoo GK301.
-Built with **Rust + Quickshell** for SEMICO **`1a2c:9df4`**.
-
-`v1.5.0 development` · [Setup](#setup) · [What it touches](#what-this-plugin-touches) · [CLI](#cli)
+[Setup](#setup) · [What it touches](#what-this-plugin-touches) · [CLI](#cli)
 
 </div>
 
-> Fullscreen selects Game. Five idle minutes turn the lights off. Your next
-> manual adjustment takes priority for 30 minutes. Enable Signal Engine when
-> you want your keyboard to follow your desktop.
+> Omarchy plugin: bar widget, control panel, CLI controller and automation
+> rules for the GK301's backlight.
 
 ```bash
 omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
 ```
 
-The repository root **is** the plugin folder. Omarchy loads the bar widget and
-the service, then the panel walks you through the two remaining steps.
+The repository root is the plugin folder. `omarchy plugin add` clones it, and
+the first load completes the setup: the controller builds from the checkout,
+and the udev rule installs through one polkit prompt. The sections below
+describe every step and how to undo them.
 
 | Signal Engine | HID Blackbox | Ghost Mode |
 | --- | --- | --- |
@@ -57,28 +54,32 @@ checks performed so far.
 
 ## Setup
 
-Install and enable the Omarchy plugin:
+Install and enable the plugin:
 
 ```bash
 omarchy plugin add https://github.com/OnurByte/OmaLecoo.git --enable
 ```
 
-**Left-click the keyboard icon in the bar and open Setup.** The repository
-root is the plugin folder. Omarchy loads its bar widget and service, but does
-not run an installation hook.
+The first load completes setup by itself:
 
-1. **Provide Rust and Cargo.** If Setup reports that Cargo is missing, its
-   prerequisite command is `omarchy pkg add rust`. After installing it, select
-   **Refresh Cargo availability**.
-2. **Select Install controller from source.** The panel runs the command below
-   and verifies the installed controller with `capabilities --json`.
-3. **Select Authorize device access…** A polkit prompt asks you to authorize the
-   GK301 udev rule. Reconnect the keyboard if access is still denied.
+1. **Native controller.** The plugin checks for `~/.local/bin/lecoo-gk301`.
+   When it is missing, the panel builds the controller from the checkout the
+   clone command just placed on disk, with `omarchy pkg add rust` run first if
+   Cargo is absent. Cargo may fetch `serde_json` from crates.io while it
+   builds; the plugin itself makes no network calls.
+2. **Device access.** While the keyboard is connected but read-only, the panel
+   raises one polkit prompt that installs the GK301 udev rule.
 
-The source installation command is:
+The **Setup** page keeps every step as a button and shows the current setup
+message. The controller build writes compile artifacts under
+`~/.cache/lecoo-gk301`; `~/.local/bin` and `~/.config` are not used for
+artifacts.
+
+The source installation equivalent is:
 
 ```bash
-cargo install --git https://github.com/OnurByte/OmaLecoo --root "$HOME/.local" --locked
+cargo install --path "$HOME/.config/omarchy/plugins/borat.lecoo-rgb" \
+  --root "$HOME/.local" --locked --target-dir "$HOME/.cache/lecoo-gk301"
 ```
 
 It installs crate `omalecoo` as **`~/.local/bin/lecoo-gk301`**, the panel's
@@ -96,9 +97,9 @@ vendor `1a2c`, product `9df4`, interface `01` with `uaccess`, then reloads and
 triggers udev. It refuses to overwrite a rule whose contents differ. Routine
 lighting controls run as your user after authorization.
 
-Both Git install commands follow the repository's default branch. This
-checkout identifies itself as v1.5.0 development; these notes do not announce
-a published v1.5 release or promise a v1.5 release asset.
+Installation follows the repository's default branch. This checkout
+identifies itself as v1.5.0 development; these notes do not announce a
+published v1.5 release or promise a v1.5 release asset.
 
 ## What this plugin touches
 
@@ -110,18 +111,21 @@ else is written, and no other plugin's configuration is modified.
 | `/etc/udev/rules.d/70-lecoo-gk301.rules` | Only in the polkit-authorized step | One udev rule granting your session access to the GK301 hidraw node. Exact-content checked: it is never overwritten with different content, and removal only deletes a file with the exact content it owns. |
 | `~/.local/bin/lecoo-gk301` | When you install the controller from source | The Rust controller. `cargo install --root "$HOME/.local"`, or any other path you choose. |
 | `~/.local/state/lecoo-gk301/` | While the plugin is used | `state.json` (your manual restore point), `rules.json` (automation settings), `macros.json` and `keys.json` (your macros and key commands), `hypr-binds.lua` (the generated Hyprland fragment), `blackbox.jsonl` (command history), `debug.log` and `command.lock`. |
+| `~/.cache/lecoo-gk301/` | During a source build | Cargo compile artifacts. Safe to delete; the next build recreates it. |
 
 - **Privileged action:** exactly one — the polkit step that writes the udev
   rule. It is invoked as `pkexec <controller> udev install` with a fixed
-  argument list, and the controller refuses to run unless it is root.
-- **Network:** none at runtime. The source installation step fetches the
-  repository through Cargo; the plugin itself never calls out.
+  argument list, and the controller refuses to run unless it is root. If
+  Cargo is missing, the setup's first step is `omarchy pkg add rust`, which
+  uses Omarchy's own package command and its own approval prompt.
+- **Network:** none at runtime. The source build may fetch the crate
+  registry, and nothing else calls out.
 - **Input:** the controller only writes HID feature reports to the keyboard.
   It never opens the keyboard's input stream and never records typed keys.
 - **Other plugins:** untouched. Omarchy's own plugin and bar settings are
   read, never written.
 
-## A keyboard that follows the desktop
+## Automation (Signal Engine)
 
 **Signal Engine** runs inside Omarchy's existing Quickshell process. There is
 no separate Rust daemon. Enable it on the **Automation** page; automation and
@@ -196,7 +200,7 @@ lecoo-gk301 keys set "Calculator" --command "omacalc"
 lecoo-gk301 keys export
 ```
 
-## Gaming zones: what the keyboard owns
+## Gaming zones
 
 The GK301 keeps ten lighting layouts in its own controller and its
 **FN+1 … FN+0** keys pick one: FPS 1, FPS 2, COD, RTS, LOL, Racing, NBA,
@@ -213,16 +217,19 @@ plugin can do is re-apply the **Gaming Special Key** effect — that is what
 the **Game** preset and the fullscreen rule do — and the keyboard then lights
 whichever zone its own FN key last selected.
 
-The **M1 / M2 / M3 loader** is a different thing: it is the original tool's
-own control, it travels in the same report, and its effect on this unit was
-not confirmed. The panel shows it under the name *Loader* and says so.
+The **loader byte** carries the Windows tool's M1, M2 and M3 values. On this
+unit the firmware lights the special-key group only for the third value: the
+first two leave the board dark at every tested brightness and combination,
+and the Windows tool sends the same values and darkens the same way. The
+panel therefore applies M3 for the Gaming Special Key effect and keeps no
+loader control of its own.
 
 ```bash
 lecoo-gk301 zones list          # the ten hardware layouts
 lecoo-gk301 zones list --json
 ```
 
-## See what was sent
+## Command log (HID Blackbox)
 
 **HID Blackbox** records OmaLecoo's vendor-HID exchanges with UTC timestamps,
 origin (`panel`, `signal`, or `cli`), report bytes, syscall return/error, and a
@@ -248,10 +255,11 @@ schedule the existing packets; it does not add new keyboard capabilities.
 | Capability | Evidence and boundary |
 | --- | --- |
 | Main lighting effects | 20 recovered effect choices; main-effect changes confirmed on the physical keyboard. [Protocol and captures](docs/FINAL-ANALYSIS.md), [user observations](docs/physical-validation.md). |
-| Brightness 0–13 | Windows UI clamps to 5; its stored record carries 13. The user confirmed a visible difference between 5 and 13. [Experiment](docs/captures/extended-brightness-experiment.md). |
-| Speed 0–2; Gaming M1/M2 | Recovered main-panel mapping: speed for effects 2–19, game-key selection for effect 1. [Analysis](docs/FINAL-ANALYSIS.md). |
+| Brightness 0–13 for general effects | Windows UI clamps to 5; its stored record carries 13. The user confirmed a visible difference between 5 and 13 for the Steady effect. [Experiment](docs/captures/extended-brightness-experiment.md). |
+| Gaming Special Key envelope | Verified on this unit at brightness 0–5 (2, 3, 4 and 5 lit with visible difference) at speed 2 with the third loader value; brightness 8, 9 and 13 render no light on this path. [Capture and sweeps](docs/captures/lighting-zone-capture.md). |
+| Speed 0–2 | Recovered main-panel mapping; speed applies to effects 2–19 and the gaming page fixes it at 2 like the Windows tool. [Analysis](docs/FINAL-ANALYSIS.md). |
 | Presets, rotation, restore | Software compositions of the existing main-panel command. No extra packet family or on-device preset storage is claimed. |
-| Gaming Special Key, M1/M2/M3 | The loader byte is the original tool's M1/M2/M3 value; the keyboard's reaction to it is not confirmed. The keyboard's own FN+1 … FN+0 keys pick the lit key group, and the controller cannot choose it. [Capture and analysis](docs/captures/lighting-zone-capture.md). |
+| Loader byte (M1/M2/M3) | The tool's stored 1/2/3 map to wire 0/1/2. On this unit only wire value 2 lights the special-key group; 0 and 1 leave it dark, and values above 2 blink and fall back. [Capture](docs/captures/lighting-zone-capture.md). |
 | Factory defaults | `restore --factory` applies the same default record the Windows tool starts with, and makes it the new manual state. |
 | Signal Engine, Blackbox, Ghost Mode | Implemented software features; static/build checks and live-validation limits are listed in [verification](docs/verification.md). |
 | Firmware response | Validated F1 reply contains firmware data. The tested GET path does not report current lighting. [Readback experiment](docs/FINAL-ANALYSIS.md#new-readback-experiment). |
@@ -272,10 +280,10 @@ The three differences that were open are now handled:
 - **The function-key configuration** exists as the GK301 key map plus a
   generated Hyprland fragment, which is how a Linux desktop programs keys.
 
-OmaLecoo also goes beyond the Windows tool in brightness (0–13 versus a UI
-clamp of 5), in per-effect control (one uniform record instead of per-effect
-pages that hide fields), and in everything the Windows app never had:
-desktop-aware rules, a local command log, and an Omarchy-native panel.
+OmaLecoo avoids per-effect pages with hidden fields: one uniform record, the
+extended brightness scale, the special-key lighting at its verified envelope,
+and desktop-aware rules, a local command log, and an Omarchy-native panel
+that the Windows app does not provide.
 
 ### Eight bytes to the keyboard
 
@@ -287,8 +295,8 @@ panel     07  FF  FF  ee  bb  ss  kk  00
 query     07  F1  00  00  00  00  00  00
 reply     07  01  16  00  00  00  00  00
 
-ee = effect 0–19    bb = brightness 0–13
-ss = speed 0–2      kk = selection 0–2
+ee = effect 0–19    bb = brightness (general 0–13, gaming lights 0–5)
+ss = speed 0–2      kk = loader 0–2 (this unit lights the third value)
 Observed firmware reply: 1.16
 ```
 
@@ -296,14 +304,14 @@ The F1 request is SET_FEATURE followed by GET_FEATURE. Repeating GET after a
 lighting command returned the same firmware reply on the tested unit. This
 bounds the claim to that query path; it does not prove no other query exists.
 
-## Preview it in Omarchy
+## Panel and bar
 
 With this plugin checkout loaded in the built-in bar, left-click its keyboard
 icon. **Lighting → Automation → Macros → Keys → Blackbox → Setup → Uninstall**
 are the seven panel pages. Open Lighting for the searchable effect grid,
-brightness, speed, Gaming M1/M2, presets and auto cycle; open Automation for
-the current rule and its reason; Macros builds lighting sequences; Keys maps
-the function keys; Blackbox provides the command history behind the controls.
+brightness, speed, presets and auto cycle; open Automation for the current
+rule and its reason; Macros builds lighting sequences; Keys maps the function
+keys; Blackbox provides the command history behind the controls.
 
 Right-click the bar icon for the next effect; scroll for brightness. Panel
 shortcuts: `n` / `p` next/previous, `o` off, `r` refresh, `Esc` close.
@@ -375,7 +383,7 @@ product commands. The hidden `probe-brightness` and `probe-startup`
 diagnostics remain research tools; historical documents may describe retired
 probes and controls.
 
-## Removal, with choices
+## Uninstall
 
 Open **Uninstall**, choose the items, select **Review selected removal…**,
 then **Confirm removal**.
@@ -397,7 +405,7 @@ A controller installed outside `~/.local` — for example `cargo install` into
 uninstall, because the plugin cannot prove that such a file belongs to it.
 Remove those with the method you installed them with.
 
-## Follow the evidence
+## Documentation
 
 - [Final protocol and readback conclusions](docs/FINAL-ANALYSIS.md)
 - [Physical user observations](docs/physical-validation.md)
@@ -425,4 +433,4 @@ version control.
 
 ## License
 
-[MIT](LICENSE) — use it, fork it, ship it.
+[MIT](LICENSE)

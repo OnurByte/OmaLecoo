@@ -21,7 +21,8 @@
 //! | [`probe`] | Hidden research diagnostics (brightness sweep, startup replay) |
 //!
 //! Protocol (vendor HID interface 1, report ID 7, 8-byte Feature reports):
-//!   panel effect : 07 FF FF <effect 0-19> <brightness 0-13> <speed 0-2> <select 0-2> 00
+//!   panel effect : 07 FF FF <effect 0-19> <brightness 0-5> <speed 0-2> <loader> 00
+//!     (gaming path lights only inside brightness 0-5, speed 2, loader M3)
 //!   firmware     : 07 F1 00 00 00 00 00 00 (set, then get)
 //!
 //! Side-lighting, raw and reset paths were removed from this tool: the

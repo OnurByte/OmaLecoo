@@ -18,7 +18,9 @@ use crate::keys;
 use crate::logging::debug_log;
 use crate::macros;
 use crate::probe::{probe_brightness, probe_startup};
-use crate::protocol::{capabilities_json, catalog_json, hex, EFFECT_NAMES, PANEL_EFFECTS};
+use crate::protocol::{
+    capabilities_json, catalog_json, hex, EFFECT_NAMES, LOADER_APPLIED, PANEL_EFFECTS,
+};
 use crate::state::{Rules, State};
 use crate::udev::udev_command;
 
@@ -234,10 +236,10 @@ pub fn dispatch(args: &[String]) -> Result<(), String> {
                 st.save()?;
             }
             println!(
-                "panel: {} ({}) brightness {}/13 speed {}/2 selection {}",
+                "panel: {} ({}) brightness {}/5 speed {}/2 loader {} (M3)",
                 st.effect,
                 st.name(),
-                st.brightness,
+                st.brightness.min(crate::protocol::WINDOWS_BRIGHTNESS_MAX),
                 st.speed,
                 st.select
             );
@@ -600,7 +602,7 @@ pub fn preset_state(name: &str) -> Result<State, String> {
             st.effect = 1;
             st.brightness = 5;
             st.speed = 2;
-            st.select = 0;
+            st.select = LOADER_APPLIED;
         }
         "night" => {
             st.effect = 2;
@@ -628,11 +630,7 @@ pub fn preset_state(name: &str) -> Result<State, String> {
             st.effect = next(PANEL_EFFECTS);
             st.brightness = 1 + next(5) as u8;
             st.speed = next(3) as u8;
-            st.select = if st.effect == 3 {
-                next(3) as u8
-            } else {
-                next(2) as u8
-            };
+            st.select = if st.effect == 1 { LOADER_APPLIED } else { 0 };
         }
         other => {
             return Err(format!(

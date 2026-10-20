@@ -59,6 +59,29 @@ would carry it receives the loader value instead. The report is therefore
 `07 FF | effect | brightness | speed | loader | 00`, exactly what the
 controller sends.
 
+## Raw sweeps — 20 October 2026
+
+Raw SET_FEATURE reports were sent directly to the vendor interface with a
+local helper (same 8-byte path as the controller; the running plugin's
+automation stayed off). Keyboard observations, shortest form, from that run:
+
+| Reports (sequential) | Observation |
+| --- | --- |
+| Gaming effect + loader 0 / 1, brightness `05`, speed `02` | Board dark |
+| Gaming + loader 2, same brightness and speed | The keyboard's current FN-zone group lights (ESC/WASD/arrows on FN+1) |
+| Gaming + loader 2 with byte 7 = 1, 2, 3 | Same group; byte 7 changes nothing |
+| Gaming + loader 2 with brightness `0D`, `08` or `09` | Board dark — the gaming path accepts brightness 0–5 |
+| Gaming + loader 2, brightness `02` / `03` / `04` | Lights, with a visible brightness difference |
+| Super-"selection" 3 … 8 | Blink and fall back |
+
+Two earlier capture rounds had recorded one sighting where the panel's M1
+lit the FN+1 group; no combination with wire loader 0 or 1 reproduced it in
+the controlled sweeps, so the value that lights this unit's special-key
+group is the third one, and the firmware behaves as if the first two slots
+are empty. The 19 October extended-brightness experiment confirms the
+general effects light brightness 0–13; the 0–5 acceptance is specific to the
+gaming path at speed 2.
+
 ## Live result
 
 | Action | Result |
@@ -68,12 +91,18 @@ controller sends.
 | Panel `Gaming Special Key` + loader 3, 4 … 8 | The keyboard **blinks** and falls back |
 | Keyboard FN+2, then the panel's `Gaming Special Key` | Lights the **FN+2 group** (TAB, SHIFT, CTRL, QWER, HOME, PRTSC, SCRLK, PGUP, END, PGDN) |
 
+The M1 row is from the earlier panel round; the raw sweeps above could not
+reproduce it and settle the applied value on M3.
+
 ## Conclusion
 
 - The **loader** byte carries the original tool's M1/M2/M3 values. It is not
   the FN zone selector: changing it does not move the lit key group, and a
   loader value above 2 makes the keyboard blink and fall back, so the wire
   byte carries exactly the three values the original Windows tool exposed.
+  On this unit the lit value is the third (M3); the first two render dark in
+  every controlled sweep, so the panel applies M3 and keeps no loader row of
+  its own.
 - The **FN zone lives in the keyboard**. The host can enter the special-key
   lighting with the `Gaming Special Key` effect, and the keyboard then lights
   whichever group its own FN key last selected.

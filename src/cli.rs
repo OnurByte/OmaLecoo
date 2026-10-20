@@ -77,7 +77,7 @@ Usage:\n\
   lecoo-gk301 udev install|remove          install or remove the device rule (root)\n\
   lecoo-gk301 next | prev                  change panel effect\n\
   lecoo-gk301 panel <0-19> [--brightness 0-13] [--speed 0-2] [--select 0-2]\n\
-  lecoo-gk301 brightness <0-13>            panel brightness (Windows app clamps to 5)\n\
+  lecoo-gk301 brightness <0-13>            panel brightness (the wire lights 0-5)\n\
   lecoo-gk301 preset <name>                silent|game|night|party|off|random\n\
   lecoo-gk301 catalog [--json]             effect catalog\n\
   lecoo-gk301 info [--json]                firmware version\n\

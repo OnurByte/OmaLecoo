@@ -30,10 +30,14 @@ in.
 
 Two further results from the same session:
 
-- The **loader has no confirmed visible effect**. A repeated A/B run with the
-  same brightness and speed showed no change for M1 or M2 and a visible
-  change for M3. The panel labels the control *Loader* and says its effect
-  was not confirmed, instead of presenting it as a zone selector.
+- The **loader's visible effect is now settled**. Repeated raw-feature sweeps
+  on 20 October 2026 lit the special-key group only with wire loader value 2
+  (M3): values 0 and 1 left the board dark at every tested brightness (0.05,
+  0x08, 0x09) and encoding, byte 7 of the alternate writer's raw form changed
+  nothing, and brightness 0x0D rendered no light on the gaming path while the
+  19 October experiment had already confirmed 13 for the Steady effect. The
+  panel applies M3 for the gaming path and offers no loader control of its
+  own; the CLI keeps `--select` as a stored value for tool parity.
 - The **original Windows tool's zone path is not settled by the static
   call graph**. Its `HidDevice::SetOutputReport` method is present in the
   binary (log tag `0x692cc0`, implementation `0x4050e0`) and the complete
@@ -73,12 +77,22 @@ step and no bound, so a page shorter than the viewport could be pushed out of
 view: the content slid up and left a gap. The scroll is now clamped to the
 content, so a short page cannot move at all and a long page stops exactly at
 its end. Two further sources of movement were removed: the speed row and the
-M1/M2 row now keep their place for every effect instead of appearing and
+loader row now keep their place for every effect instead of appearing and
 disappearing, and the bar tooltip no longer appends a state that changes
 while the pointer rests on it. The effect names in the panel come from the
 controller's catalog now, so the panel shows the original tool's own names
 (`Gaming Special Key`, `Marquee effect`, `Diagonal transformation`, …)
 instead of a second, shorter list kept in the QML.
+
+**Self-setup.** The marketplace review classified the listing's setup as
+manual because the native controller and the udev rule required directed
+steps. The first load now performs both: when the controller is missing it
+builds from the checkout the shell cloned (`cargo install --path`,
+`--target-dir ~/.cache/lecoo-gk301`) and starts with `omarchy pkg add rust`
+if Cargo is absent, and while the keyboard is connected but read-only it
+raises the one polkit prompt for the udev rule. Each step goes through its
+own approval prompt, a failed chain stops and does not retry this session,
+and the Setup page keeps the same steps as buttons.
 
 **The missing features.** The three differences that the Windows app still
 had are handled:

@@ -18,18 +18,23 @@ pub struct State {
     pub brightness: u8,
     /// Effect speed, 0–2.
     pub speed: u8,
-    /// Gaming M1/M2 selection, 0–2.
+    /// Gaming loader byte, 0–2 (stored for parity; the panel path always
+    /// sends the implemented third value).
     pub select: u8,
 }
 
 impl Default for State {
     fn default() -> Self {
-        // Matches the Windows app defaults: brightness 5, speed 2, first option.
+        // Brightness 5 and speed 2 match the Windows app defaults. The loader
+        // defaults to the third value (M3): the only one this firmware
+        // implements for the gaming path, so the game preset lights out of
+        // the box instead of leaving a dark board as the tool's first-run
+        // selection does.
         Self {
             effect: 0,
             brightness: 5,
             speed: 2,
-            select: 0,
+            select: 2,
         }
     }
 }
