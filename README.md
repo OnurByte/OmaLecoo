@@ -4,6 +4,8 @@
 
 # OmaLecoo
 
+[![Built for Omarchy: Plugin](https://raw.githubusercontent.com/tcballard/omarchy-badges/75975e5b5bf75e7ede3764bcd2950046f7abfe2c/badges/v1/omarchy-plugin.svg)](https://github.com/tcballard/omarchy-badges)
+
 Native lighting control and an event-aware automation service for the Lecoo
 GK301, built with Rust and Quickshell for SEMICO `1a2c:9df4`.
 
