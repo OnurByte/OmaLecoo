@@ -433,20 +433,11 @@ fn macro_command(args: &[String], device: Option<&str>, origin: &str) -> Result<
                 .get(2)
                 .map(String::as_str)
                 .ok_or("usage: lecoo-gk301 macro import <file>")?;
-            let text = std::fs::read_to_string(file)
-                .map_err(|e| format!("could not read {}: {}", file, e))?;
-            let value: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| format!("{} is not valid JSON: {}", file, e))?;
-            let items = match value.get("macros").and_then(serde_json::Value::as_array) {
-                Some(items) => items.clone(),
-                None => vec![value.clone()],
-            };
-            let mut count = 0;
-            for item in &items {
-                if let Some(macro_def) = macros::Macro::from_json(item) {
-                    macros::upsert(&mut macros, macro_def);
-                    count += 1;
-                }
+            let imported = macros::read_document(std::path::Path::new(file))
+                .map_err(|e| format!("could not import {}: {}", file, e))?;
+            let count = imported.len();
+            for macro_def in imported {
+                macros::upsert(&mut macros, macro_def);
             }
             if count == 0 {
                 return Err(format!("{} contains no usable macro", file));

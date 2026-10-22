@@ -9,7 +9,7 @@
 //! same process lock as every other writer.
 
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -25,6 +25,69 @@ pub const MACRO_FILE: &str = "macros.json";
 
 /// Longest macro name or group the panel's listing rows are sized for.
 const TEXT_LIMIT: usize = 80;
+
+/// Resource budgets shared by import, persistence and the panel listing.
+pub const MAX_DOCUMENT_BYTES: usize = 1024 * 1024;
+pub const MAX_MACROS: usize = 64;
+pub const MAX_STEPS_PER_MACRO: usize = 256;
+pub const MAX_TOTAL_STEPS: usize = 4096;
+
+/// Reads at most one byte beyond the budget, including for growing files.
+pub fn read_document(path: &std::path::Path) -> Result<Vec<Macro>, String> {
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    file.take((MAX_DOCUMENT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_DOCUMENT_BYTES {
+        return Err(format!(
+            "macro document exceeds {} bytes",
+            MAX_DOCUMENT_BYTES
+        ));
+    }
+    let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    let items = match value.get("macros") {
+        Some(items) => items
+            .as_array()
+            .ok_or("macros must be an array")?
+            .as_slice(),
+        None => std::slice::from_ref(&value),
+    };
+    if items.len() > MAX_MACROS {
+        return Err(format!("collection exceeds {} macros", MAX_MACROS));
+    }
+    // Count raw steps before filtering invalid entries; invalid input cannot
+    // hide a resource-budget violation.
+    let mut total = 0;
+    for item in items {
+        if let Some(steps) = item.get("steps").and_then(Value::as_array) {
+            if steps.len() > MAX_STEPS_PER_MACRO {
+                return Err(format!("macro exceeds {} steps", MAX_STEPS_PER_MACRO));
+            }
+            total += steps.len();
+            if total > MAX_TOTAL_STEPS {
+                return Err(format!(
+                    "collection exceeds {} total steps",
+                    MAX_TOTAL_STEPS
+                ));
+            }
+        }
+    }
+    Ok(items.iter().filter_map(Macro::from_json).collect())
+}
+
+fn validate_collection(macros: &[Macro]) -> io::Result<()> {
+    if macros.len() > MAX_MACROS
+        || macros.iter().any(|m| m.steps.len() > MAX_STEPS_PER_MACRO)
+        || macros.iter().map(|m| m.steps.len()).sum::<usize>() > MAX_TOTAL_STEPS
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "macro collection budget exceeded (64 macros, 256 steps per macro, 4096 total steps)",
+        ));
+    }
+    Ok(())
+}
 
 /// Normalizes a name or group coming from a macro document: control
 /// characters are removed and the text is capped before it is stored. The
@@ -149,9 +212,11 @@ impl Macro {
             .and_then(Value::as_u64)
             .unwrap_or(1)
             .clamp(1, 64) as u32;
-        let steps = value
-            .get("steps")?
-            .as_array()?
+        let items = value.get("steps")?.as_array()?;
+        if items.len() > MAX_STEPS_PER_MACRO {
+            return None;
+        }
+        let steps = items
             .iter()
             .map(Step::from_json)
             .collect::<Option<Vec<_>>>()?;
@@ -171,30 +236,26 @@ pub fn path() -> PathBuf {
 
 /// Loads every stored macro. A malformed document yields an empty list.
 pub fn load() -> Vec<Macro> {
-    let text = match fs::read_to_string(path()) {
-        Ok(text) => text,
-        Err(_) => return Vec::new(),
-    };
-    let value: Value = match serde_json::from_str(&text) {
-        Ok(value) => value,
-        Err(_) => return Vec::new(),
-    };
-    value
-        .get("macros")
-        .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Macro::from_json).collect())
-        .unwrap_or_default()
+    read_document(&path()).unwrap_or_default()
 }
 
 /// Stores the macro list.
 pub fn save(macros: &[Macro]) -> io::Result<()> {
+    validate_collection(macros)?;
+    let document = json!({ "macros": macros.iter().map(Macro::to_json).collect::<Vec<_>>() });
+    let text = format!("{}\n", document);
+    if text.len() > MAX_DOCUMENT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "macro document exceeds byte budget",
+        ));
+    }
     let path = path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let document = json!({ "macros": macros.iter().map(Macro::to_json).collect::<Vec<_>>() });
     let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
-    fs::write(&tmp, format!("{}\n", document))?;
+    fs::write(&tmp, text)?;
     fs::rename(tmp, path)
 }
 
@@ -253,11 +314,17 @@ pub fn play(macro_def: &Macro, device_arg: Option<&str>, origin: &str) -> Result
 
 /// Parses a JSON array of steps, as the command line and the panel pass it.
 pub fn parse_steps(text: &str) -> Result<Vec<Step>, String> {
+    if text.len() > MAX_DOCUMENT_BYTES {
+        return Err("--steps exceeds byte budget".into());
+    }
     let value: Value = serde_json::from_str(text.trim())
         .map_err(|e| format!("--steps must be a JSON array: {}", e))?;
     let items = value
         .as_array()
         .ok_or("--steps must be a JSON array of step objects")?;
+    if items.len() > MAX_STEPS_PER_MACRO {
+        return Err(format!("--steps exceeds {} steps", MAX_STEPS_PER_MACRO));
+    }
     let mut steps = Vec::new();
     for item in items {
         steps.push(Step::from_json(item).ok_or("--steps contains an invalid step value")?);

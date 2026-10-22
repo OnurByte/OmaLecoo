@@ -178,6 +178,12 @@ lecoo-gk301 macro export ~/macros.json
 lecoo-gk301 macro import ~/macros.json
 ```
 
+Macro documents are limited to 1 MiB, 64 macros, 256 steps per macro,
+and 4,096 total steps across the collection. These limits apply to imports,
+the merged saved collection, and loading existing state. An over-budget
+import fails without changing saved macros; an over-budget or malformed
+saved document produces an empty listing (the file is left untouched).
+
 ## Function keys
 
 The **Keys** page lists the GK301's function and media keys with the names and
