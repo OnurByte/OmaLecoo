@@ -347,7 +347,7 @@ then **Confirm removal**.
 | Plugin checkout (selected by default) | Starts detached `omarchy plugin remove borat.lecoo-rgb --yes` after the selected cleanup finishes. |
 | Controller under `~/.local` | Runs `cargo uninstall --root "$HOME/.local" omalecoo`; requires Cargo and the managed controller path. Custom configured binary paths are left for their original installation method. |
 | GK301 udev rule (optional) | Runs `pkexec <configured-controller> udev remove`; removes only the exact owned rule and reloads/triggers udev. |
-| Settings and diagnostic logs (optional) | Runs `<configured-controller> state clear` before removing the controller. Deletes `state.json`, `rules.json`, both Blackbox files and both debug logs. |
+| Settings and diagnostic logs (optional) | Runs `<configured-controller> state clear` before removing the controller. Deletes `state.json`, `rules.json`, `macros.json`, `keys.json`, `hypr-binds.lua`, both Blackbox files and both debug logs. |
 
 State and device access are preserved unless selected. Cleanup stops on a
 failure before proceeding to later steps. State cleanup leaves `command.lock`,

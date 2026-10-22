@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import qs.Ui as Ui
 
@@ -744,6 +745,8 @@ Panel {
     // A configured custom controller path means the binary is managed outside
     // this plugin; it installs nothing and touches no state.
     if (root.binary !== root.localBinary) return
+    autoProbe.output = ""
+    autoProbe.handled = false
     autoProbe.running = true
   }
 
@@ -773,6 +776,7 @@ Panel {
         ]
       })
       steps.push({ label: "Verifying installed controller", argv: [root.localBinary, "capabilities", "--json"] })
+      steps.push({ label: "Checking device access", argv: [root.binary, "dev", "--json"] })
     }
     if (connected && !writable) {
       steps.push({ label: "Authorizing the GK301 udev rule", argv: ["pkexec", root.binary, "udev", "install"] })
@@ -813,6 +817,22 @@ Panel {
 
   function autoSetupStepFinished(code) {
     if (code === 0) {
+      if (root.autoSetupLastStep === "Checking device access") {
+        try {
+          var presence = JSON.parse(String(autoStepProc.output || "{}"))
+          if (presence.connected === true && presence.writable !== true) {
+            root.autoSetupQueue = [
+              { label: "Authorizing the GK301 udev rule", argv: ["pkexec", root.binary, "udev", "install"] },
+              { label: "Verifying device access", argv: [root.binary, "dev", "--json"] }
+            ].concat(root.autoSetupQueue)
+          }
+        } catch (e) {
+          root.autoSetupStage = ""
+          root.autoSetupQueue = []
+          root.setupMessage = "Could not read device access status; retry from Setup."
+          return
+        }
+      }
       if (root.autoSetupLastStep === "Verifying device access") {
         try {
           var data = JSON.parse(String(autoStepProc.output || "{}"))
@@ -921,7 +941,7 @@ Panel {
               Text {
                 width: parent.width
                 text: "OmaLecoo · GK301"
-                color: Color.foreground
+                color: Commons.Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.title
                 font.bold: true
@@ -935,7 +955,7 @@ Panel {
                       + "  ·  " + root.effectLabel(root.effect)
                       + "  ·  " + root.brightness + "/13"
                       + (root.autoCycle ? "  ·  auto " + root.cycleSeconds + " s" : "")
-                color: Color.muted
+                color: Commons.Color.muted
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
                 elide: Text.ElideRight
@@ -981,7 +1001,7 @@ Panel {
             text: [root.lastError, root.connectionError].filter(function(value) { return value !== "" }).join("\n")
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
-            color: Color.urgent
+            color: Commons.Color.urgent
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
           }
@@ -989,7 +1009,7 @@ Panel {
           Note {
             width: parent.width
             text: root.signalService ? root.signalService.connectionMessage : root.connectionError
-            color: root.deviceConnected && root.deviceWritable ? Color.muted : Color.urgent
+            color: root.deviceConnected && root.deviceWritable ? Commons.Color.muted : Commons.Color.urgent
           }
 
           Row {
@@ -1016,7 +1036,7 @@ Panel {
             }
           }
 
-          PanelSeparator { foreground: Color.foreground }
+          PanelSeparator { foreground: Commons.Color.foreground }
 
           Column {
             visible: root.page === "lighting"
@@ -1031,13 +1051,13 @@ Panel {
             PanelSectionHeader {
               width: parent.width - effectCounter.width - Style.space(8)
               text: "LIGHTING EFFECTS"
-              foreground: Color.foreground
+              foreground: Commons.Color.foreground
             }
 
             Text {
               id: effectCounter
               text: (root.effect + 1) + " / " + root.panelCount
-              color: Color.muted
+              color: Commons.Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
@@ -1079,7 +1099,7 @@ Panel {
             visible: root.panelNames.length === 0
             width: parent.width
             text: "Loading effects…"
-            color: Color.muted
+            color: Commons.Color.muted
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
           }
@@ -1093,7 +1113,7 @@ Panel {
               width: Style.space(88)
               height: brightnessSlider.implicitHeight
               text: "Brightness"
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
               verticalAlignment: Text.AlignVCenter
@@ -1117,7 +1137,7 @@ Panel {
               width: Style.space(34)
               height: brightnessSlider.implicitHeight
               text: Math.round(brightnessSlider.liveValue) + "/13"
-              color: Color.muted
+              color: Commons.Color.muted
               horizontalAlignment: Text.AlignRight
               verticalAlignment: Text.AlignVCenter
               font.family: Style.font.family
@@ -1139,7 +1159,7 @@ Panel {
               width: Style.space(88)
               height: Style.space(28)
               text: "Speed"
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
               verticalAlignment: Text.AlignVCenter
@@ -1152,9 +1172,9 @@ Panel {
                 { value: "2", label: "Fast" }
               ]
               value: String(root.speed)
-              foreground: Color.foreground
-              background: Color.popups.background
-              accent: Color.accent
+              foreground: Commons.Color.foreground
+              background: Commons.Color.popups.background
+              accent: Commons.Color.accent
               onChanged: function(v) { root.setSpeed(Number(v)) }
             }
           }
@@ -1173,7 +1193,7 @@ Panel {
           PanelSectionHeader {
             width: parent.width
             text: "GAMING ZONES"
-            foreground: Color.foreground
+            foreground: Commons.Color.foreground
           }
 
           Note {
@@ -1191,7 +1211,7 @@ Panel {
                 width: Style.space(52)
                 text: String(modelData.key || "")
                 textFormat: Text.PlainText
-                color: Color.foreground
+                color: Commons.Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
               }
@@ -1199,7 +1219,7 @@ Panel {
                 width: Style.space(80)
                 text: String(modelData.name || "")
                 textFormat: Text.PlainText
-                color: Color.foreground
+                color: Commons.Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
               }
@@ -1207,7 +1227,7 @@ Panel {
                 width: parent.width - Style.space(138)
                 text: String(modelData.lights || "")
                 textFormat: Text.PlainText
-                color: Color.muted
+                color: Commons.Color.muted
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
                 elide: Text.ElideRight
@@ -1219,7 +1239,7 @@ Panel {
           PanelSectionHeader {
             width: parent.width
             text: "PRESETS"
-            foreground: Color.foreground
+            foreground: Commons.Color.foreground
           }
 
           Row {
@@ -1246,7 +1266,7 @@ Panel {
                 horizontalPadding: Style.space(2)
                 verticalPadding: 0
                 bordered: true
-                background: Color.popups.background
+                background: Commons.Color.popups.background
                 onClicked: root.applyPreset(modelData.key)
               }
             }
@@ -1266,7 +1286,7 @@ Panel {
               width: Style.space(88)
               height: Style.space(28)
               text: "Auto cycle"
-              color: Color.foreground
+              color: Commons.Color.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
               verticalAlignment: Text.AlignVCenter
@@ -1280,17 +1300,17 @@ Panel {
                 { value: "300", label: "5 min" }
               ]
               value: String(root.cycleSeconds)
-              foreground: Color.foreground
-              background: Color.popups.background
-              accent: Color.accent
+              foreground: Commons.Color.foreground
+              background: Commons.Color.popups.background
+              accent: Commons.Color.accent
               onChanged: function(v) { root.cycleSeconds = Number(v) }
             }
 
             ToggleSwitch {
               id: autoSwitch
               checked: root.autoCycle
-              foreground: Color.foreground
-              accent: Color.accent
+              foreground: Commons.Color.foreground
+              accent: Commons.Color.accent
               onToggled: root.autoCycle = !root.autoCycle
             }
           }
@@ -1299,7 +1319,7 @@ Panel {
             width: parent.width
             text: "Speed support varies by effect. Settings show the last command sent to the keyboard."
             wrapMode: Text.WordWrap
-            color: Color.muted
+            color: Commons.Color.muted
             font.pixelSize: Style.font.caption
           }
           Text {
@@ -1308,7 +1328,7 @@ Panel {
             text: root.debugText
             textFormat: Text.PlainText
             wrapMode: Text.WrapAnywhere
-            color: Color.muted
+            color: Commons.Color.muted
             font.pixelSize: Style.font.caption
           }
 
@@ -1318,7 +1338,7 @@ Panel {
             visible: root.page === "automation"
             width: parent.width
             spacing: Style.space(10)
-            PanelSectionHeader { text: "SIGNAL ENGINE"; foreground: Color.foreground }
+            PanelSectionHeader { text: "SIGNAL ENGINE"; foreground: Commons.Color.foreground }
             Note {
               width: parent.width
               text: root.signalService ? root.signalService.activeRule + "\n" + root.signalService.ruleReason
@@ -1349,7 +1369,7 @@ Panel {
             visible: root.page === "macros"
             width: parent.width
             spacing: Style.space(8)
-            PanelSectionHeader { text: "MACROS"; foreground: Color.foreground }
+            PanelSectionHeader { text: "MACROS"; foreground: Commons.Color.foreground }
             Note {
               width: parent.width
               text: "A macro is a timed sequence of lighting states, played on the keyboard. The original Windows tool recorded key sequences; on Linux the compositor owns keyboard input, so OmaLecoo macros move the lights."
@@ -1369,7 +1389,7 @@ Panel {
                     width: parent.width
                     text: String(modelData.name || "")
                     textFormat: Text.PlainText
-                    color: Color.foreground
+                    color: Commons.Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.body
                     elide: Text.ElideRight
@@ -1407,8 +1427,8 @@ Panel {
               text: "No macros saved yet."
             }
 
-            PanelSeparator { foreground: Color.foreground }
-            PanelSectionHeader { text: "NEW MACRO"; foreground: Color.foreground }
+            PanelSeparator { foreground: Commons.Color.foreground }
+            PanelSectionHeader { text: "NEW MACRO"; foreground: Commons.Color.foreground }
 
             Ui.TextField {
               id: macroNameField
@@ -1487,7 +1507,7 @@ Panel {
             visible: root.page === "keys"
             width: parent.width
             spacing: Style.space(8)
-            PanelSectionHeader { text: "FUNCTION KEYS"; foreground: Color.foreground }
+            PanelSectionHeader { text: "FUNCTION KEYS"; foreground: Commons.Color.foreground }
             Note {
               width: parent.width
               text: "The GK301's function and media keys, as the original Windows tool listed them in its config.xml. The commands run through Hyprland; the plugin writes a fragment you include from your own Hyprland config."
@@ -1507,7 +1527,7 @@ Panel {
                     width: parent.width
                     text: String(modelData.name || "")
                     textFormat: Text.PlainText
-                    color: Color.foreground
+                    color: Commons.Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption
                     elide: Text.ElideRight
@@ -1555,7 +1575,7 @@ Panel {
             visible: root.page === "blackbox"
             width: parent.width
             spacing: Style.space(8)
-            PanelSectionHeader { text: "HID BLACKBOX"; foreground: Color.foreground }
+            PanelSectionHeader { text: "HID BLACKBOX"; foreground: Commons.Color.foreground }
             Note { width: parent.width; text: "Recent vendor HID commands only. Firmware responses are acknowledgements; they do not report lighting state. Typed keys are never recorded." }
             Button { text: "Refresh history"; onClicked: root.refreshBlackbox() }
             Note { width: parent.width; text: root.blackboxError || (root.blackboxEntries.length === 0 ? "No recorded HID commands yet." : "Newest first · up to 40 entries") }
@@ -1573,7 +1593,7 @@ Panel {
                     + " · syscall " + (modelData.syscall ? String(modelData.syscall.return) : "—")
                     + (modelData.syscall && modelData.syscall.error ? " · " + modelData.syscall.error : "")
                 }
-                PanelSeparator { width: parent.width; foreground: Color.foreground }
+                PanelSeparator { width: parent.width; foreground: Commons.Color.foreground }
               }
             }
           }
@@ -1582,7 +1602,7 @@ Panel {
             visible: root.page === "setup"
             width: parent.width
             spacing: Style.space(10)
-            PanelSectionHeader { text: "SETUP"; foreground: Color.foreground }
+            PanelSectionHeader { text: "SETUP"; foreground: Commons.Color.foreground }
             Note { width: parent.width; text: "After the plugin is enabled, the first load performs setup by itself: it builds the controller from this checkout, verifies the binary and raises one polkit prompt for the udev rule while the keyboard is connected but denied. This page keeps the same steps as buttons and shows the current setup message." }
             Note { width: parent.width; visible: root.setupMessage !== ""; text: root.setupMessage; wrapMode: Text.WrapAnywhere }
             Note { width: parent.width; text: "Manual falls back: install the controller into ~/.local with Cargo and Rust, or press the button below. The build uses this checked-out source, not a remote URL." }
@@ -1607,7 +1627,7 @@ Panel {
             visible: root.page === "uninstall"
             width: parent.width
             spacing: Style.space(10)
-            PanelSectionHeader { text: "REMOVE OMALECOO"; foreground: Color.foreground }
+            PanelSectionHeader { text: "REMOVE OMALECOO"; foreground: Commons.Color.foreground }
             Note { width: parent.width; text: "Choose what to remove. State and device access are preserved unless selected. Cleanup finishes before the plugin is unloaded." }
             OptionRow { width: parent.width; label: "Remove Omarchy plugin checkout"; checked: root.removePlugin; enabled: !root.setupBusy; onToggled: { root.removePlugin = !checked; root.removalConfirmed = false } }
             OptionRow { width: parent.width; label: "Cargo uninstall controller under ~/.local"; checked: root.removeController; enabled: !root.setupBusy && root.binary === root.localBinary && root.cargoAvailable; onToggled: { root.removeController = !checked; root.removalConfirmed = false } }
@@ -1623,7 +1643,7 @@ Panel {
             Note {
               width: parent.width
               visible: root.removalConfirmed
-              color: Color.urgent
+              color: Commons.Color.urgent
               text: "Confirm removal of: " + [root.removePlugin ? "plugin checkout" : "", root.removeController ? "local controller" : "", root.removeUdev ? "udev rule" : "", root.removeState ? "settings and logs" : ""].filter(function(v) { return v !== "" }).join(", ") + "."
             }
             Button {
@@ -1644,7 +1664,7 @@ Panel {
   component Note: Text {
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
-    color: Color.muted
+    color: Commons.Color.muted
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }
@@ -1656,7 +1676,7 @@ Panel {
     signal toggled()
     spacing: Style.space(8)
     Note { width: option.width - optionSwitch.width - option.spacing; text: option.label; anchors.verticalCenter: parent.verticalCenter }
-    ToggleSwitch { id: optionSwitch; checked: option.checked; foreground: Color.foreground; accent: Color.accent; onToggled: option.toggled() }
+    ToggleSwitch { id: optionSwitch; checked: option.checked; foreground: Commons.Color.foreground; accent: Commons.Color.accent; onToggled: option.toggled() }
   }
 
   // Compact chip with an index number and an elided label; the stock Button
@@ -1667,9 +1687,9 @@ Panel {
     property string label: ""
     property string indexLabel: ""
     property bool selected: false
-    property color foreground: Color.foreground
-    property color accent: Color.accent
-    property color background: Color.popups.background
+    property color foreground: Commons.Color.foreground
+    property color accent: Commons.Color.accent
+    property color background: Commons.Color.popups.background
 
     signal picked()
 
@@ -1700,7 +1720,7 @@ Panel {
         width: Style.space(15)
         text: chip.indexLabel
         textFormat: Text.PlainText
-        color: chip.selected ? chip.accent : Color.muted
+        color: chip.selected ? chip.accent : Commons.Color.muted
         font.family: Style.font.family
         font.pixelSize: Style.font.caption
         anchors.verticalCenter: parent.verticalCenter

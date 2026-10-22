@@ -657,6 +657,9 @@ pub fn clear_state() -> Result<(), String> {
     for name in [
         "state.json",
         "rules.json",
+        keys::KEY_FILE,
+        keys::FRAGMENT_FILE,
+        macros::MACRO_FILE,
         "blackbox.jsonl",
         "blackbox.jsonl.1",
         "debug.log",

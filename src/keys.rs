@@ -173,6 +173,24 @@ pub fn set_command(entries: &mut [KeyEntry], name: &str, command: &str) -> Resul
     Ok(())
 }
 
+/// Quotes a Lua short string, including control bytes and Windows paths.
+fn lua_string(value: &str) -> String {
+    let mut out = String::from("\"");
+    for c in value.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_ascii_control() => out.push_str(&format!("\\{:03}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 /// Builds the Hyprland fragment for the current key map.
 pub fn fragment(entries: &[KeyEntry]) -> String {
     let mut out = String::new();
@@ -194,8 +212,10 @@ pub fn fragment(entries: &[KeyEntry]) -> String {
             continue;
         }
         out.push_str(&format!(
-            "o.bind(\"{}\", \"{} ({})\", \"{}\")\n",
-            entry.linux_key, entry.name, entry.code, entry.command
+            "o.bind({}, {}, {})\n",
+            lua_string(&entry.linux_key),
+            lua_string(&format!("{} ({})", entry.name, entry.code)),
+            lua_string(&entry.command)
         ));
     }
     out

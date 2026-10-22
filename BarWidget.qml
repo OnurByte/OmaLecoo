@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // OmaLecoo: bar entry point for the Lecoo GK301 RGB panel.
@@ -88,7 +89,7 @@ BarWidget {
     text: "\uf11c"
     active: root.panel ? (root.panel.deviceConnected && root.panel.lit) : false
     opacity: root.panel && !root.panel.deviceConnected ? 0.5 : 1
-    activeColor: Color.accent
+    activeColor: Commons.Color.accent
     tooltipText: root.panel ? root.panel.tooltipText() : "OmaLecoo · Lecoo GK301"
     onPressed: function(b) {
       if (b === Qt.RightButton) {
