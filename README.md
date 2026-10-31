@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/omalecoo-banner.png" alt="OmaLecoo — Lecoo GK301 RGB control for Omarchy" width="900">
+<img src="docs/assets/omalecoo-logo.svg" alt="OmaLecoo — Lecoo identity in Omarchy-inspired pixel lettering" width="900">
 
 # OmaLecoo
 
